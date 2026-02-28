@@ -1,0 +1,40 @@
+<svg width="200" height="60" viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Glow effect -->
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <linearGradient id="diamondGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#60a5fa"/>
+      <stop offset="100%" style="stop-color:#3b82f6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Diamond shape (rotated rounded square) -->
+  <g filter="url(#glow)">
+    <rect
+      x="30"
+      y="30"
+      width="28"
+      height="28"
+      rx="5"
+      fill="url(#diamondGradient)"
+      transform="rotate(-45 44 44)"
+    />
+  </g>
+
+  <!-- Text -->
+  <text
+    x="72"
+    y="42"
+    font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+    font-size="32"
+    font-weight="700"
+    fill="white"
+    letter-spacing="-0.02em"
+  >AppX</text>
+</svg>

@@ -1,0 +1,11 @@
+export { default as Landing } from './Landing';
+export { default as Login } from './Login';
+export { default as Register } from './Register';
+export { default as Dashboard } from './Dashboard';
+export { default as ProjectWizard } from './ProjectWizard';
+export { default as Canvas } from './ProjectPage';
+export { default as Settings } from './Settings';
+export { default as Terms } from './Terms';
+export { default as Privacy } from './Privacy';
+export { default as Pricing } from './Pricing';
+export { default as Gallery } from './Gallery';

@@ -1,0 +1,12 @@
+export { CodeEditor, type CodeEditorProps } from './CodeEditor';
+export { default } from './CodeEditor';
+export { FileTree, type ProjectFile } from './FileTree';
+export { EditorTabs } from './EditorTabs';
+export { MonacoEditor } from './MonacoEditor';
+export { Terminal } from './Terminal';
+export { SearchPanel } from './SearchPanel';
+export { ProblemsPanel } from './ProblemsPanel';
+export { DiffView } from './DiffView';
+export { GitPanel, type GitChangedFile, type GitFileStatus } from './GitPanel';
+export { QuickOpen } from './QuickOpen';
+export { EditorLayout } from './EditorLayout';
