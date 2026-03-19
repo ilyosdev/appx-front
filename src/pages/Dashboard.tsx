@@ -7,7 +7,6 @@ import {
   FolderKanban,
   Layers,
   Sparkles,
-  TrendingUp,
   MoreVertical,
   Pencil,
   Trash2,
@@ -22,6 +21,7 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { projectsApi, type Project as ApiProject, type ProjectStatus as ApiProjectStatus } from '../lib/projects';
 import { useAuthStore } from '../stores/authStore';
 import { rewriteStorageUrl } from '../lib/api';
+import { AppComposer } from '../components/composer/AppComposer';
 
 type DisplayStatus = 'draft' | 'generating' | 'completed' | 'failed';
 
@@ -34,13 +34,6 @@ interface DisplayProject {
   thumbnailUrl?: string;
   updatedAt: string;
   createdAt: string;
-}
-
-interface DashboardStats {
-  totalProjects: number;
-  screensGenerated: number;
-  creditsRemaining: number;
-  monthlyUsage: number;
 }
 
 function mapProjectStatus(status: ApiProjectStatus): DisplayStatus {
@@ -79,36 +72,6 @@ const fetchProjects = async () => {
     pageSize: 50,
   });
   return response.data.data;
-};
-
-const deriveStats = (
-  projects: DisplayProject[],
-  total: number,
-  userCredits?: string | number
-): DashboardStats => {
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-  const thisMonthProjects = projects.filter(p => {
-    const createdAt = new Date(p.createdAt);
-    return createdAt >= startOfMonth;
-  });
-
-  const totalScreens = projects.reduce((acc, p) => acc + p.screensCount, 0);
-  const thisMonthScreens = thisMonthProjects.reduce((acc, p) => acc + p.screensCount, 0);
-
-  let credits = -1;
-  if (userCredits !== undefined) {
-    credits = typeof userCredits === 'string' ? parseInt(userCredits, 10) : userCredits;
-    if (isNaN(credits)) credits = -1;
-  }
-
-  return {
-    totalProjects: total,
-    screensGenerated: totalScreens,
-    creditsRemaining: credits,
-    monthlyUsage: thisMonthScreens,
-  };
 };
 
 const containerVariants: Variants = {
@@ -235,19 +198,6 @@ function formatRelativeDate(dateString: string): string {
   }).format(date);
 }
 
-function StatCardSkeleton() {
-  return (
-    <div className="relative overflow-hidden rounded-2xl bg-surface-800/50 border border-surface-700/50 p-6">
-      <div className="animate-pulse space-y-3">
-        <div className="h-4 w-20 bg-surface-700 rounded" />
-        <div className="h-8 w-16 bg-surface-700 rounded" />
-        <div className="h-3 w-24 bg-surface-700/50 rounded" />
-      </div>
-      <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-surface-700/10 to-transparent" />
-    </div>
-  );
-}
-
 function ProjectCardSkeleton() {
   return (
     <div className="relative overflow-hidden rounded-2xl bg-surface-800/50 border border-surface-700/50">
@@ -262,54 +212,6 @@ function ProjectCardSkeleton() {
       </div>
       <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-surface-700/10 to-transparent" />
     </div>
-  );
-}
-
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  subtext,
-  accentColor,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string | number;
-  subtext?: string;
-  accentColor: string;
-}) {
-  return (
-    <motion.div
-      variants={itemVariants}
-      className="group relative overflow-hidden rounded-2xl bg-surface-800/50 border border-surface-700/50 p-6 backdrop-blur-sm transition-colors hover:border-surface-600/50"
-    >
-      <div
-        className={cn(
-          'absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-0 transition-opacity duration-500 group-hover:opacity-20',
-          accentColor
-        )}
-      />
-
-      <div className="relative">
-        <div
-          className={cn(
-            'inline-flex items-center justify-center w-10 h-10 rounded-xl mb-3',
-            accentColor.replace('bg-', 'bg-opacity-15 text-').replace('-500', '-400')
-          )}
-          style={{
-            backgroundColor: `color-mix(in srgb, currentColor 15%, transparent)`,
-          }}
-        >
-          <Icon className={cn('w-5 h-5', accentColor.replace('bg-', 'text-'))} />
-        </div>
-
-        <p className="text-sm font-medium text-surface-400 mb-1">{label}</p>
-        <p className="text-3xl font-bold text-white tracking-tight">{value}</p>
-        {subtext && (
-          <p className="text-xs text-surface-500 mt-1">{subtext}</p>
-        )}
-      </div>
-    </motion.div>
   );
 }
 
@@ -527,6 +429,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   );
 }
 
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -589,59 +492,25 @@ export default function Dashboard() {
   };
 
   const projects: DisplayProject[] = projectsData?.data.map(mapApiProjectToDisplay) || [];
-  const stats = projectsData ? deriveStats(projects, projectsData.total, user?.creditsRemaining) : null;
 
   return (
     <DashboardLayout title="Dashboard" showNewProject>
       <div className="space-y-8">
-        <section>
-          <h2 className="text-sm font-medium text-surface-400 uppercase tracking-wider mb-4">
-            Overview
-          </h2>
-          {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCardSkeleton />
-              <StatCardSkeleton />
-              <StatCardSkeleton />
-              <StatCardSkeleton />
-            </div>
-          ) : (
-            <motion.div
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
-            >
-              <StatCard
-                icon={FolderKanban}
-                label="Total Projects"
-                value={stats?.totalProjects ?? 0}
-                subtext="All time"
-                accentColor="bg-primary-500"
-              />
-              <StatCard
-                icon={Layers}
-                label="Screens Generated"
-                value={stats?.screensGenerated ?? 0}
-                subtext="Across all projects"
-                accentColor="bg-cyan-500"
-              />
-              <StatCard
-                icon={Sparkles}
-                label="Credits Remaining"
-                value={stats?.creditsRemaining === -1 ? 'Unlimited' : (stats?.creditsRemaining ?? 0)}
-                subtext={user?.plan ? `${user.plan} plan` : 'free plan'}
-                accentColor="bg-emerald-500"
-              />
-              <StatCard
-                icon={TrendingUp}
-                label="This Month"
-                value={stats?.monthlyUsage ?? 0}
-                subtext="Screens this month"
-                accentColor="bg-amber-500"
-              />
-            </motion.div>
-          )}
+        <section className="pt-2 pb-2">
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="text-center mb-8"
+          >
+            <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight mb-2">
+              Build your app
+            </h1>
+            <p className="text-surface-400 text-base">
+              Describe what you want and AI builds it in minutes
+            </p>
+          </motion.div>
+          <AppComposer />
         </section>
 
         <section>

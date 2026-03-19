@@ -15,14 +15,13 @@ import {
   Send,
   Code2,
   Eye,
-  BarChart3,
   Crown,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useBillingStore } from "@/stores/billingStore";
 import { PLAN_FEATURES } from "@/lib/payments";
 import type { PlanType } from "@/lib/payments";
-import { useExpoPreviewStore } from "@/stores/expoPreviewStore";
+import { useDeployment } from "@/hooks/useDeployment";
 import { cn } from "@/lib/utils";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { InviteModal } from "@/components/collaboration/InviteModal";
@@ -96,6 +95,10 @@ interface CanvasHeaderProps {
   socketError?: string | null;
   publishedUrl?: string | null;
   onDeploymentComplete?: (url: string) => void;
+  /** Active center panel tab */
+  centerTab?: 'preview' | 'code';
+  /** Callback to switch center panel tab */
+  onCenterTabChange?: (tab: 'preview' | 'code') => void;
 }
 
 export function CanvasHeader({
@@ -110,6 +113,8 @@ export function CanvasHeader({
   socketConnected,
   socketReconnecting,
   socketError,
+  centerTab = 'preview',
+  onCenterTabChange,
 }: CanvasHeaderProps) {
   const navigate = useNavigate();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -132,15 +137,21 @@ export function CanvasHeader({
         setSettingsOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
   }, [settingsOpen]);
 
-  // Expo preview store
-  const { currentStatus, openModal: openExpoModal } = useExpoPreviewStore();
-  const isExpoActive =
-    currentStatus === "active" || currentStatus === "updating";
-  const isExpoCreating = currentStatus === "creating";
+  // Deployment status
+  const { deployment, status: deployStatus, provision } = useDeployment(projectId);
+  const deployStatusConfig: Record<string, { color: string; pulse?: boolean; label: string }> = {
+    provisioning: { color: 'bg-yellow-400', pulse: true, label: 'Provisioning' },
+    warm: { color: 'bg-blue-400', label: 'Ready' },
+    deploying: { color: 'bg-yellow-400', pulse: true, label: 'Deploying' },
+    running: { color: 'bg-emerald-400', label: 'Live' },
+    sleeping: { color: 'bg-gray-400', label: 'Sleeping' },
+    error: { color: 'bg-red-400', label: 'Error' },
+  };
+  const deployCfg = deployStatusConfig[deployStatus];
 
   // Collaboration
   const {
@@ -160,7 +171,7 @@ export function CanvasHeader({
 
   return (
     <>
-      <header className="h-14 flex items-center justify-between px-4 border-b border-surface-800/50 bg-surface-950/80 backdrop-blur-xl flex-shrink-0">
+      <header className="h-14 flex items-center justify-between px-4 border-b border-surface-800/50 bg-surface-950/80 backdrop-blur-xl flex-shrink-0 relative z-20">
         {/* Left: Back + Project name + Access badge */}
         <div className="flex items-center gap-3">
           <Link
@@ -176,14 +187,14 @@ export function CanvasHeader({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-sm font-semibold text-white">
+                <h1 className="text-sm font-semibold text-white truncate max-w-[120px] md:max-w-none">
                   {projectName}
                 </h1>
-                {myAccessLevel !== "none" && (
+                {myAccessLevel && myAccessLevel !== "none" && (
                   <AccessBadge role={myAccessLevel} size="sm" />
                 )}
               </div>
-              <p className="text-xs text-surface-500">
+              <p className="text-xs text-surface-500 hidden md:block">
                 Last saved {formatRelativeTime(lastSavedAt)}
               </p>
             </div>
@@ -198,84 +209,111 @@ export function CanvasHeader({
             />
           )}
 
-          {/* Presence indicator -- online collaborators */}
-          <PresenceIndicator onlineUsers={onlineUsers} maxAvatars={5} />
+          {/* Presence indicator -- online collaborators -- hidden on mobile */}
+          <div className="hidden md:block">
+            <PresenceIndicator onlineUsers={onlineUsers} maxAvatars={5} />
+          </div>
         </div>
 
-        {/* Center: Code / Preview / Analytics tabs */}
-        <div className="flex items-center gap-0.5 bg-surface-800/40 rounded-lg p-0.5">
+        {/* Center: Preview / Code / Files tabs */}
+        <div className="hidden md:flex items-center gap-0.5 bg-surface-800/40 rounded-lg p-0.5">
+          <button
+            onClick={() => onCenterTabChange?.('preview')}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+              centerTab === 'preview'
+                ? "bg-surface-700/60 text-white"
+                : "text-surface-400 hover:text-white hover:bg-surface-700/50",
+            )}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            Web Preview
+          </button>
           <button
             onClick={() => {
               if (!canEditCode) {
                 openUpgradeModal('exports', 'Upgrade to access the code editor.');
                 return;
               }
-              if (projectId) navigate(`/project/${projectId}/code`);
+              onCenterTabChange?.('code');
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-surface-400 hover:text-white hover:bg-surface-700/50 transition-colors"
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+              centerTab === 'code'
+                ? "bg-surface-700/60 text-white"
+                : "text-surface-400 hover:text-white hover:bg-surface-700/50",
+            )}
           >
             <Code2 className="w-3.5 h-3.5" />
             Code
             {!canEditCode && <Crown className="w-3 h-3 text-cyan-400" />}
           </button>
-          <button
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-surface-700/60 text-white"
-            disabled
-          >
-            <Eye className="w-3.5 h-3.5" />
-            Preview
-          </button>
-          <button
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-surface-500 cursor-not-allowed opacity-50"
-            disabled
-            title="Coming soon"
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            Analytics
-          </button>
         </div>
 
         {/* Right: GitHub + Share + Run on Device + Export + Settings */}
         <div className="flex items-center gap-2">
-          {/* GitHub integration */}
-          {projectId && <GitHubButton projectId={projectId} />}
+          {/* GitHub integration -- hidden on mobile */}
+          <div className="hidden md:block">
+            {projectId && <GitHubButton projectId={projectId} />}
+          </div>
 
-          {/* Share button with collaborator dropdown */}
-          <ShareButton
-            collaboratorCount={acceptedCollaborators.length}
-            collaborators={collaborators}
-            owner={owner}
-            onInvite={openInviteModal}
-          />
+          {/* Share button with collaborator dropdown -- hidden on mobile */}
+          <div className="hidden md:block">
+            <ShareButton
+              collaboratorCount={acceptedCollaborators.length}
+              collaborators={collaborators}
+              owner={owner}
+              onInvite={openInviteModal}
+            />
+          </div>
 
-          {/* Run on Device -- hero CTA */}
+          {/* Deploy status pill */}
+          {deployCfg && (
+            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-800/50 border border-surface-700/50">
+              <div className={cn("w-2 h-2 rounded-full", deployCfg.color, deployCfg.pulse && "animate-pulse")} />
+              <span className="text-xs text-surface-300">{deployCfg.label}</span>
+            </div>
+          )}
+
+          {/* Run on Device -- deploy CTA */}
           <button
-            onClick={openExpoModal}
+            onClick={() => {
+              if (deployStatus === 'none' || deployStatus === 'error') {
+                provision();
+              }
+              // If already running/deploying, the status pill shows state
+            }}
             className={cn(
               "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-lg",
-              isExpoActive
+              deployStatus === 'running'
                 ? "bg-emerald-500 text-white hover:bg-emerald-400 shadow-emerald-500/20"
-                : "bg-primary-500 text-white hover:bg-primary-400 shadow-primary-500/20",
+                : deployStatus === 'provisioning' || deployStatus === 'deploying'
+                  ? "bg-yellow-500 text-white hover:bg-yellow-400 shadow-yellow-500/20"
+                  : "bg-primary-500 text-white hover:bg-primary-400 shadow-primary-500/20",
             )}
           >
-            {isExpoCreating ? (
+            {(deployStatus === 'provisioning' || deployStatus === 'deploying') ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <div className="relative">
                 <Smartphone className="w-4 h-4" />
-                {isExpoActive && (
+                {deployStatus === 'running' && (
                   <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-white animate-pulse" />
                 )}
               </div>
             )}
-            {isExpoCreating
-              ? "Starting..."
-              : isExpoActive
-                ? "Live on Device"
-                : "Run on Device"}
+            <span className="hidden md:inline">
+              {deployStatus === 'provisioning'
+                ? "Provisioning..."
+                : deployStatus === 'deploying'
+                  ? "Deploying..."
+                  : deployStatus === 'running'
+                    ? "Live on Device"
+                    : "Run on Device"}
+            </span>
           </button>
 
-          {/* Export */}
+          {/* Export -- hidden on mobile */}
           <button
             onClick={() => {
               if (!canEditCode) {
@@ -284,7 +322,7 @@ export function CanvasHeader({
               }
               onExport();
             }}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-800/50 border border-surface-700/50 text-surface-300 hover:text-white hover:bg-surface-800 transition-colors text-sm font-medium"
+            className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-800/50 border border-surface-700/50 text-surface-300 hover:text-white hover:bg-surface-800 transition-colors text-sm font-medium"
           >
             <Download className="w-4 h-4" />
             Export

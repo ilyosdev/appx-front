@@ -39,10 +39,13 @@ interface PhonePreviewPanelProps {
   stageMessage?: string;
   progressPercent?: number;
   isRNProject?: boolean;
+  expoSessionId?: string | null;
+  deploymentWebUrl?: string | null;
   onRebuild?: () => void;
   onFixWithAI?: (screen: ScreenData) => void;
   onRegenerate?: (screen: ScreenData) => void;
   onRunOnDevice?: () => void;
+  onFixErrors?: (errorMessage: string) => void;
 }
 
 export function PhonePreviewPanel({
@@ -52,10 +55,13 @@ export function PhonePreviewPanel({
   stageMessage,
   progressPercent,
   isRNProject,
+  expoSessionId,
+  deploymentWebUrl,
   onRebuild,
   onFixWithAI,
   onRegenerate,
   onRunOnDevice,
+  onFixErrors,
 }: PhonePreviewPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -222,6 +228,13 @@ export function PhonePreviewPanel({
                       </button>
                     )}
                   </div>
+                ) : isRNProject && deploymentWebUrl ? (
+                  <iframe
+                    src={deploymentWebUrl}
+                    className="w-full h-full border-0 bg-white"
+                    title="Live Preview"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                  />
                 ) : isRNProject ? (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-surface-900 text-surface-400 p-6">
                     <div className="w-16 h-16 rounded-2xl bg-primary-500/10 border border-primary-500/30 flex items-center justify-center mb-4">
@@ -343,6 +356,7 @@ export function PhonePreviewPanel({
           </button>
         </div>
       )}
+
     </div>
   );
 }

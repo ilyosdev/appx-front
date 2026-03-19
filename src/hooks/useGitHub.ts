@@ -25,6 +25,7 @@ interface UseGitHubReturn {
   status: GitHubStatus | null;
   isLoading: boolean;
   error: string | null;
+  isAvailable: boolean;
   getStatus: () => Promise<GitHubStatus | null>;
   getAuthUrl: () => Promise<string>;
   connectRepo: (repoFullName: string) => Promise<void>;
@@ -42,6 +43,7 @@ export function useGitHub(projectId: string): UseGitHubReturn {
   const [error, setError] = useState<string | null>(null);
   const [isPushing, setIsPushing] = useState(false);
   const [isPulling, setIsPulling] = useState(false);
+  const [isAvailable, setIsAvailable] = useState(false);
 
   const getStatus = useCallback(async (): Promise<GitHubStatus | null> => {
     if (!projectId) return null;
@@ -187,17 +189,28 @@ export function useGitHub(projectId: string): UseGitHubReturn {
     }
   }, [projectId]);
 
+  // Check if GitHub integration is configured
+  useEffect(() => {
+    api.get("/github/config-status")
+      .then((res) => {
+        const configured = res.data.data?.configured ?? res.data.configured;
+        setIsAvailable(!!configured);
+      })
+      .catch(() => setIsAvailable(false));
+  }, []);
+
   // Auto-fetch status on mount
   useEffect(() => {
-    if (projectId) {
+    if (projectId && isAvailable) {
       getStatus();
     }
-  }, [projectId, getStatus]);
+  }, [projectId, isAvailable, getStatus]);
 
   return {
     status,
     isLoading,
     error,
+    isAvailable,
     getStatus,
     getAuthUrl,
     connectRepo,

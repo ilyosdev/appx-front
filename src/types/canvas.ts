@@ -71,6 +71,7 @@ export interface LocalMessage {
   content: string;
   isStreaming?: boolean;
   error?: boolean;
+  warning?: boolean;
   createdScreenId?: string;
   metadata?: {
     screenType?: string;
@@ -78,11 +79,12 @@ export interface LocalMessage {
     description?: string;
     isGenerationMessage?: boolean;
     isInitialPrompt?: boolean;
-    type?: "progress" | "screen_suggestion";
+    type?: "progress" | "screen_suggestion" | "reasoning" | "tool_calls" | "artifact" | "inline_progress";
     recommendations?: {
       essential: RecommendationItem[];
       optional: RecommendationItem[];
     };
+    changeSummary?: string[];
     [key: string]: unknown;
   };
 }
@@ -113,6 +115,46 @@ export interface ActivePopup {
   elementText: string;
   elementType: string;
   elementSelector: string;
+}
+
+// Action Log types (Rork-style agent activity feed)
+export const ActionLogType = {
+  THINKING: 'thinking',
+  ANALYZING: 'analyzing',
+  READ_FILE: 'read_file',
+  CREATE_FILE: 'create_file',
+  EDIT_FILE: 'edit_file',
+  GENERATE_CODE: 'generate_code',
+  VALIDATE: 'validate',
+  FIX_ERROR: 'fix_error',
+  GENERATE_IMAGE: 'generate_image',
+  SEARCH: 'search',
+  RUN_COMMAND: 'run_command',
+} as const;
+
+export type ActionLogType = (typeof ActionLogType)[keyof typeof ActionLogType];
+
+export const ActionLogStatus = {
+  STARTED: 'started',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+} as const;
+
+export type ActionLogStatus = (typeof ActionLogStatus)[keyof typeof ActionLogStatus];
+
+export interface ActionLogEvent {
+  id: string;
+  type: ActionLogType;
+  status: ActionLogStatus;
+  timestamp: number;
+  metadata?: {
+    fileName?: string;
+    summary?: string;
+    duration?: number;
+    toolName?: string;
+    query?: string;
+    error?: string;
+  };
 }
 
 // Constants

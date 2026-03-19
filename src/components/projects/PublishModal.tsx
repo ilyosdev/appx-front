@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Globe, X, Loader2, Check, AlertTriangle, Eye, EyeOff, ImageOff, RefreshCw } from 'lucide-react';
+import { Globe, X, Loader2, Check, AlertTriangle, Eye, EyeOff, ImageOff, RefreshCw, Copy, ExternalLink } from 'lucide-react';
 import { projectsApi } from '@/lib/projects';
 import { projectsApi as projectsApiClient } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -23,6 +23,8 @@ interface PublishModalProps {
   screens: ScreenInfo[];
   onPublishSuccess: () => void;
   onRefreshScreens: () => Promise<void>;
+  slug?: string | null;
+  onOpenSettings?: () => void;
 }
 
 export function PublishModal({
@@ -34,6 +36,8 @@ export function PublishModal({
   screens,
   onPublishSuccess,
   onRefreshScreens,
+  slug,
+  onOpenSettings,
 }: PublishModalProps) {
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -442,14 +446,37 @@ export function PublishModal({
               )}
 
               {isPublished && (
-                <div className="p-4 rounded-xl bg-surface-950/50 border border-surface-800">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Eye className="w-4 h-4 text-surface-400" />
-                    <span className="text-sm font-medium text-surface-300">Status</span>
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-surface-950/50 border border-surface-800">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Eye className="w-4 h-4 text-surface-400" />
+                      <span className="text-sm font-medium text-surface-300">Status</span>
+                    </div>
+                    <p className="text-sm text-surface-400 leading-relaxed">
+                      Your project is currently visible in the public gallery. Anyone can view and get inspired by your designs.
+                    </p>
                   </div>
-                  <p className="text-sm text-surface-400 leading-relaxed">
-                    Your project is currently visible in the public gallery. Anyone can view and get inspired by your designs.
-                  </p>
+
+                  {slug ? (
+                    <PublishedUrlSection slug={slug} />
+                  ) : (
+                    <div className="p-4 rounded-xl bg-primary-500/5 border border-primary-500/20">
+                      <p className="text-sm text-surface-300 mb-2">
+                        Set a custom URL slug in Project Settings to get a shareable published page.
+                      </p>
+                      {onOpenSettings && (
+                        <button
+                          onClick={() => {
+                            onClose();
+                            onOpenSettings();
+                          }}
+                          className="text-sm text-primary-400 hover:text-primary-300 font-medium transition-colors"
+                        >
+                          Open Project Settings
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -565,5 +592,48 @@ export function PublishModal({
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+function PublishedUrlSection({ slug }: { slug: string }) {
+  const [copied, setCopied] = useState(false);
+  const url = `${window.location.origin}/app/${slug}`;
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback
+    }
+  };
+
+  return (
+    <div className="p-4 rounded-xl bg-surface-950/50 border border-surface-800">
+      <div className="flex items-center gap-2 mb-2">
+        <Globe className="w-4 h-4 text-emerald-400" />
+        <span className="text-sm font-medium text-surface-300">Published URL</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="flex-1 px-3 py-2 rounded-lg bg-surface-800 border border-surface-700 text-sm text-white truncate">
+          {url}
+        </div>
+        <button
+          onClick={handleCopy}
+          className="p-2 rounded-lg bg-surface-800 border border-surface-700 text-surface-400 hover:text-white hover:bg-surface-700 transition-colors shrink-0"
+        >
+          {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+        </button>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="p-2 rounded-lg bg-surface-800 border border-surface-700 text-surface-400 hover:text-white hover:bg-surface-700 transition-colors shrink-0"
+        >
+          <ExternalLink className="w-4 h-4" />
+        </a>
+      </div>
+    </div>
   );
 }

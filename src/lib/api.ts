@@ -300,6 +300,11 @@ export const publicApi = {
     const response = await axios.get(`${API_BASE_URL}/public/projects/${projectId}`);
     return response.data.data;
   },
+
+  getProjectBySlug: async (slug: string): Promise<PublicProjectData> => {
+    const response = await axios.get(`${API_BASE_URL}/public/projects/by-slug/${slug}`);
+    return response.data.data;
+  },
 };
 
 // Publish API
@@ -327,58 +332,6 @@ export interface UploadThumbnailResponse {
 export interface UploadCoverResponse {
   url: string;
 }
-
-// Expo Preview API
-export interface ExpoSessionResponse {
-  sessionId: string;
-  expoUrl: string;
-  qrCodeDataUrl: string;
-  port: number;
-  status?: string;
-  expiresAt: string;
-  lastActivityAt?: string;
-}
-
-export const expoPreviewApi = {
-  createSession: async (data: {
-    projectId: string;
-    screenId?: string;
-    reactNativeCode: string;
-    screenName: string;
-  }): Promise<ExpoSessionResponse> => {
-    const response = await api.post("/expo-preview/sessions", data);
-    return response.data.data || response.data;
-  },
-
-  updateSession: async (
-    sessionId: string,
-    reactNativeCode: string,
-  ): Promise<{ success: boolean }> => {
-    const response = await api.patch(
-      `/expo-preview/sessions/${sessionId}`,
-      { reactNativeCode },
-    );
-    return response.data.data || response.data;
-  },
-
-  destroySession: async (sessionId: string): Promise<void> => {
-    await api.delete(`/expo-preview/sessions/${sessionId}`);
-  },
-
-  getSessionStatus: async (
-    sessionId: string,
-  ): Promise<ExpoSessionResponse> => {
-    const response = await api.get(
-      `/expo-preview/sessions/${sessionId}/status`,
-    );
-    return response.data.data || response.data;
-  },
-
-  getUserSessions: async (): Promise<ExpoSessionResponse[]> => {
-    const response = await api.get("/expo-preview/sessions");
-    return response.data.data || response.data;
-  },
-};
 
 export const projectsApi = {
   publish: async (

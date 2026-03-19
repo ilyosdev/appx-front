@@ -9,6 +9,10 @@ let isConnecting = false;
 let pendingProjectId: string | null = null;
 let disconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
+// Streaming resume state — tracks active generation for auto-resume on reconnect
+let activeGenerationId: string | null = null;
+let lastReceivedSeq: number = -1;
+
 export function connectSocket(projectId: string, wsUrl?: string): Socket {
   // Cancel any pending disconnect (React Strict Mode recovery)
   if (disconnectTimeout) {
@@ -73,6 +77,15 @@ export function connectSocket(projectId: string, wsUrl?: string): Socket {
     console.log('[Socket] Connected:', socket?.id, 'Project:', projectId);
     isConnecting = false;
     pendingProjectId = null;
+
+    // Auto-resume streaming if we had an active generation
+    if (activeGenerationId && lastReceivedSeq >= 0) {
+      console.log(`[Socket] Resuming generation ${activeGenerationId} from seq ${lastReceivedSeq}`);
+      socket?.emit('generation:resume', {
+        generationId: activeGenerationId,
+        lastSeq: lastReceivedSeq,
+      });
+    }
   });
 
   socket.on('disconnect', (reason) => {
@@ -110,8 +123,42 @@ export function disconnectSocket(): void {
   }, 100); // 100ms delay to allow reconnect to cancel
 }
 
+export function getSocket(): Socket | null {
+  return socket;
+}
+
 export function isSocketConnected(): boolean {
   return socket?.connected ?? false;
+}
+
+// ── Streaming resume helpers ──────────────────────────────────────
+
+/**
+ * Track an active streaming generation for auto-resume on disconnect.
+ * Call this when a generation starts streaming.
+ */
+export function trackActiveGeneration(generationId: string): void {
+  activeGenerationId = generationId;
+  lastReceivedSeq = -1;
+}
+
+/**
+ * Update the last received sequence number for the active generation.
+ * Call this from stream event handlers when events have a `seq` field.
+ */
+export function updateLastSeq(seq: number): void {
+  if (seq > lastReceivedSeq) {
+    lastReceivedSeq = seq;
+  }
+}
+
+/**
+ * Clear the active generation tracking.
+ * Call this when generation completes or is cancelled.
+ */
+export function clearActiveGeneration(): void {
+  activeGenerationId = null;
+  lastReceivedSeq = -1;
 }
 
 export function forceDisconnect(): void {

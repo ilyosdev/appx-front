@@ -97,6 +97,7 @@ export interface UpdateProjectDto {
   description?: string;
   prompt?: string;
   styleId?: string;
+  designSystem?: DesignSystem;
 }
 
 export interface Project {
@@ -115,7 +116,17 @@ export interface Project {
   publishedAt?: string | null;
   coverImageUrl?: string | null;
   galleryDescription?: string | null;
+  enabledFeatures?: string[];
   generationTarget?: 'web' | 'rn';
+  slug?: string | null;
+  bundleIdIos?: string | null;
+  bundleIdAndroid?: string | null;
+  appName?: string | null;
+  appShortName?: string | null;
+  appIconUrl?: string | null;
+  themeColor?: string | null;
+  apiDocumentation?: string | null;
+  referenceImageUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -183,6 +194,15 @@ export interface ListProjectsParams {
   status?: ProjectStatus;
   sortBy?: 'createdAt' | 'updatedAt' | 'name';
   sortOrder?: 'asc' | 'desc';
+}
+
+export interface EnvVarResponse {
+  id: string;
+  key: string;
+  value: string; // masked for secrets
+  isSecret: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export const projectsApi = {
@@ -255,4 +275,73 @@ export const projectsApi = {
 
   exportCode: (projectId: string) =>
     api.get(`/projects/${projectId}/export?format=react`, { responseType: 'blob' }),
+
+  checkSlugAvailability: async (slug: string, excludeProjectId?: string) => {
+    const params = excludeProjectId ? { excludeProjectId } : {};
+    const response = await api.get(`/projects/slug/check/${slug}`, { params });
+    const body = response.data;
+    return (body.data || body) as { available: boolean; slug: string };
+  },
+
+  uploadIcon: async (projectId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('icon', file);
+    const response = await api.post(`/projects/${projectId}/icon`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data.data as { url: string };
+  },
+
+  updateFeatures: async (projectId: string, features: string[]) => {
+    const response = await api.patch(`/projects/${projectId}`, { enabledFeatures: features });
+    return response.data;
+  },
+
+  updateSettings: async (projectId: string, settings: {
+    slug?: string;
+    bundleIdIos?: string;
+    bundleIdAndroid?: string;
+    appName?: string;
+    appShortName?: string;
+    appIconUrl?: string;
+    themeColor?: string;
+  }) => {
+    const response = await api.patch(`/projects/${projectId}`, settings);
+    return response.data;
+  },
+
+  // API Documentation
+  uploadApiDocs: async (projectId: string, apiSpec: string) => {
+    const { data } = await api.patch(`/projects/${projectId}/api-docs`, { apiSpec });
+    return data as {
+      success: boolean;
+      title: string;
+      version: string;
+      baseUrl: string;
+      authType: string | null;
+      endpointCount: number;
+      endpoints: Array<{ method: string; path: string; summary: string; responseSchema?: string }>;
+    };
+  },
+  removeApiDocs: async (projectId: string) => {
+    const { data } = await api.delete(`/projects/${projectId}/api-docs`);
+    return data as { success: boolean };
+  },
+
+  // Env vars
+  getEnvVars: async (projectId: string) => {
+    const { data } = await api.get(`/projects/${projectId}/env-vars`);
+    return (data.data ?? data) as EnvVarResponse[];
+  },
+  createEnvVar: async (projectId: string, dto: { key: string; value: string; isSecret?: boolean }) => {
+    const { data } = await api.post(`/projects/${projectId}/env-vars`, dto);
+    return (data.data ?? data) as EnvVarResponse;
+  },
+  updateEnvVar: async (projectId: string, varId: string, dto: { key?: string; value?: string; isSecret?: boolean }) => {
+    const { data } = await api.patch(`/projects/${projectId}/env-vars/${varId}`, dto);
+    return (data.data ?? data) as EnvVarResponse;
+  },
+  deleteEnvVar: async (projectId: string, varId: string) => {
+    await api.delete(`/projects/${projectId}/env-vars/${varId}`);
+  },
 };

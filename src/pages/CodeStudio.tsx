@@ -8,8 +8,6 @@ import { Button } from '../components/ui/Button';
 import { api } from '../lib/api';
 import { DeployButton } from '@/components/deployment/DeployButton';
 import { SubmitToDevButton } from '@/components/submission/SubmitToDevButton';
-import { MobilePreviewButton } from '@/components/preview/MobilePreviewButton';
-import { ExpoPreviewModal } from '@/components/preview/ExpoPreviewModal';
 import { useEditorStore } from '@/stores/editorStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useBillingStore } from '@/stores/billingStore';
@@ -62,7 +60,6 @@ export default function CodeStudio() {
   const [chatCollapsed, setChatCollapsed] = useState(true);
 
   const activeFilePath = useEditorStore((s) => s.activeFilePath);
-  const openFiles = useEditorStore((s) => s.openFiles);
   const addTerminalLine = useEditorStore((s) => s.addTerminalLine);
   const markFileSaved = useEditorStore((s) => s.markFileSaved);
 
@@ -255,8 +252,6 @@ export default function CodeStudio() {
         </div>
 
         <div className="flex items-center gap-2">
-          <MobilePreviewButton />
-
           {projectId && (
             <SubmitToDevButton
               projectId={projectId}
@@ -316,24 +311,6 @@ export default function CodeStudio() {
         </div>
       </div>
 
-      {projectId && (
-        <ExpoPreviewModal
-          projectId={projectId}
-          getCurrentCode={() => {
-            if (activeFilePath) {
-              const openFile = openFiles.get(activeFilePath);
-              return openFile?.content || null;
-            }
-            return null;
-          }}
-          getCurrentScreenName={() =>
-            activeSourceFile?.screenName ||
-            activeSourceFile?.filename ||
-            'Screen'
-          }
-          getCurrentScreenId={() => activeSourceFile?.id}
-        />
-      )}
     </div>
   );
 }

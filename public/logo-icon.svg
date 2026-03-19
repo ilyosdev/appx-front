@@ -1,26 +1,10 @@
 <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-      <feMerge>
-        <feMergeNode in="coloredBlur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-    <linearGradient id="diamondGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#60a5fa"/>
-      <stop offset="100%" style="stop-color:#3b82f6"/>
-    </linearGradient>
-  </defs>
-  <g filter="url(#glow)">
-    <rect
-      x="14"
-      y="14"
-      width="36"
-      height="36"
-      rx="8"
-      fill="url(#diamondGradient)"
-      transform="rotate(45 32 32)"
-    />
-  </g>
+  <!-- Top-left: "a" -->
+  <path d="M4 30C4 16.745 14.745 6 28 6h2v24H4z" fill="white"/>
+  <!-- Top-right: "p" -->
+  <path d="M34 6h2c13.255 0 24 10.745 24 24v0H34V6z" fill="white"/>
+  <!-- Bottom-left: "d" -->
+  <path d="M4 34h26v24H28C14.745 58 4 47.255 4 34z" fill="white"/>
+  <!-- Bottom-right: "x" -->
+  <path d="M34 34h26v0c0 13.255-10.745 24-24 24h-2V34z" fill="white"/>
 </svg>

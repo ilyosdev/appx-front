@@ -5,10 +5,14 @@ import {
   FileCode,
   FileJson,
   FileType,
+  FileText,
   ChevronRight,
   ChevronDown,
   Plus,
   Trash2,
+  Settings,
+  Palette,
+  ChevronsDownUp,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -68,10 +72,15 @@ function getFileIcon(filename: string) {
     case 'css':
     case 'scss':
     case 'less':
-      return FileType;
+      return Palette;
     case 'js':
     case 'jsx':
       return FileCode;
+    case 'md':
+    case 'txt':
+      return FileText;
+    case 'config':
+      return Settings;
     default:
       return FileType;
   }
@@ -85,8 +94,9 @@ function getFileIconColor(filename: string): string {
 
   switch (extension) {
     case 'tsx':
-    case 'ts':
       return 'text-blue-400';
+    case 'ts':
+      return 'text-sky-400';
     case 'json':
       return 'text-yellow-400';
     case 'css':
@@ -96,9 +106,26 @@ function getFileIconColor(filename: string): string {
     case 'js':
     case 'jsx':
       return 'text-yellow-300';
+    case 'md':
+    case 'txt':
+      return 'text-surface-400';
+    case 'config':
+      return 'text-surface-500';
     default:
       return 'text-surface-400';
   }
+}
+
+/**
+ * Count total file descendants in a tree node (excluding folders)
+ */
+function countFiles(node: TreeNode): number {
+  if (!node.isFolder) return 1;
+  let count = 0;
+  for (const child of node.children) {
+    count += countFiles(child);
+  }
+  return count;
 }
 
 /**
@@ -325,6 +352,7 @@ function TreeNodeItem({
       ? FolderOpen
       : Folder
     : getFileIcon(node.name);
+  const fileCount = node.isFolder ? countFiles(node) : 0;
 
   const handleClick = () => {
     if (node.isFolder) {
@@ -347,15 +375,15 @@ function TreeNodeItem({
         onClick={handleClick}
         onContextMenu={handleContextMenu}
         className={cn(
-          'w-full flex items-center gap-1 px-2 py-1 text-sm rounded-md transition-colors',
+          'group w-full flex items-center gap-1 px-2 py-[3px] text-[13px] transition-colors',
           'hover:bg-surface-700/50',
-          isSelected && 'bg-primary-500/20 text-primary-300'
+          isSelected && 'bg-primary-500/15 text-primary-300'
         )}
-        style={{ paddingLeft: `${depth * 12 + 8}px` }}
+        style={{ paddingLeft: `${depth * 16 + 8}px` }}
       >
         {/* Expand/collapse indicator for folders */}
         {node.isFolder ? (
-          <span className="w-4 h-4 flex items-center justify-center text-surface-500">
+          <span className="w-4 h-4 flex items-center justify-center text-surface-500 shrink-0">
             {isExpanded ? (
               <ChevronDown className="w-3.5 h-3.5" />
             ) : (
@@ -363,13 +391,13 @@ function TreeNodeItem({
             )}
           </span>
         ) : (
-          <span className="w-4 h-4" />
+          <span className="w-4 h-4 shrink-0" />
         )}
 
         {/* File/folder icon */}
         <FileIcon
           className={cn(
-            'w-4 h-4 flex-shrink-0',
+            'w-4 h-4 shrink-0',
             node.isFolder ? 'text-amber-400' : getFileIconColor(node.name)
           )}
         />
@@ -383,6 +411,13 @@ function TreeNodeItem({
         >
           {node.name}
         </span>
+
+        {/* File count badge for collapsed folders */}
+        {node.isFolder && !isExpanded && fileCount > 0 && (
+          <span className="ml-auto mr-1 text-[10px] text-surface-600 tabular-nums">
+            {fileCount}
+          </span>
+        )}
       </button>
 
       {/* Render children if folder is expanded */}
@@ -456,10 +491,14 @@ export function FileTree({
     const allFolderPaths = collectFolderPaths(tree);
 
     // Auto-expand first 2 levels and common important folders
+    const commonFolders = new Set([
+      'app', 'app/(tabs)', 'components', 'components/ui',
+      'constants', 'mocks', 'types', 'lib', 'hooks',
+      'src', 'src/app', 'src/components',
+    ]);
     const foldersToExpand = allFolderPaths.filter((path) => {
       const depth = path.split('/').length;
-      const isCommonFolder = ['app', 'components', 'components/ui', 'lib', 'src', 'src/app', 'src/components'].includes(path);
-      return depth <= 2 || isCommonFolder;
+      return depth <= 2 || commonFolders.has(path);
     });
 
     if (foldersToExpand.length > 0) {
@@ -529,18 +568,32 @@ export function FileTree({
     <div className={cn('flex flex-col h-full', className)}>
       {/* Header with optional create button */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-surface-700">
-        <span className="text-xs font-semibold text-surface-400 uppercase tracking-wider">
-          Files
-        </span>
-        {onFileCreate && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-surface-400 uppercase tracking-wider">
+            Explorer
+          </span>
+          <span className="text-[10px] text-surface-600 tabular-nums">
+            {files.filter((f) => f.type === 'file').length} files
+          </span>
+        </div>
+        <div className="flex items-center gap-0.5">
           <button
-            onClick={onFileCreate}
+            onClick={() => setExpandedFolders(new Set())}
             className="p-1 rounded hover:bg-surface-700 text-surface-400 hover:text-surface-200 transition-colors"
-            title="Create new file"
+            title="Collapse All"
           >
-            <Plus className="w-4 h-4" />
+            <ChevronsDownUp className="w-3.5 h-3.5" />
           </button>
-        )}
+          {onFileCreate && (
+            <button
+              onClick={onFileCreate}
+              className="p-1 rounded hover:bg-surface-700 text-surface-400 hover:text-surface-200 transition-colors"
+              title="Create new file"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* File tree content */}

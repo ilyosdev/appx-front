@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Socket } from 'socket.io-client';
-import { connectSocket, disconnectSocket } from '@/lib/socket';
+import { connectSocket, disconnectSocket, trackActiveGeneration, updateLastSeq, clearActiveGeneration } from '@/lib/socket';
 import { useAuthStore } from '@/stores/authStore';
 import { useBillingStore } from '@/stores/billingStore';
+import { ActionLogStatus, type ActionLogEvent } from '@/types/canvas';
 
 export interface ScreenState {
   status: 'queued' | 'generating' | 'streaming' | 'complete' | 'error';
@@ -52,6 +53,14 @@ export interface ChatCompleteData {
     description: string;
     category: 'essential' | 'optional';
   }>;
+  changeSummary?: string[] | null;
+  actionLogs?: ActionLogEvent[];
+  /** Error message when intent could not be fulfilled (e.g. modify_failed) */
+  error?: string;
+  /** Plan refinement fields */
+  planId?: string;
+  planSteps?: Array<{ id: number; title: string; description: string; files: string[]; action: string }>;
+  planVersion?: number;
 }
 
 export interface ScreenErrorData {
@@ -81,6 +90,7 @@ export interface GenerationStartParams {
     tabs: Array<{ name: string; icon: string; screenId: string }>;
   };
   projectVisualDescription?: string;
+  modelId?: string;
 }
 
 export interface MultiFileStartParams {
@@ -91,11 +101,14 @@ export interface MultiFileStartParams {
     type: string;
     tabs: Array<{ name: string; icon: string; screenId: string }>;
   };
+  modelId?: string;
 }
 
 export interface MultiFileModifyParams {
-  prompt: string;
+  userRequest: string;
+  prompt?: string;
   targetFiles?: string[];
+  modelId?: string;
 }
 
 export interface MultiFileState {
@@ -104,6 +117,33 @@ export interface MultiFileState {
   currentFile: string | null;
   progress: { completed: number; total: number };
   error: string | null;
+  summary?: string | null;
+  validation?: Array<{
+    screenId?: string;
+    screenName?: string;
+    status: 'passed' | 'failed' | 'skipped';
+    errors?: string[];
+  }> | null;
+  /** DB message ID for the completed generation (set on multi:complete) */
+  completedMessageId?: string | null;
+  /** Action logs snapshot from the completed generation */
+  completedActionLogs?: ActionLogEvent[] | null;
+}
+
+export interface DesignSystemGenerateParams {
+  userInput: string;
+  referenceImageUrl?: string;
+  imageMode?: string;
+  modelId?: string;
+}
+
+export interface DesignSystemState {
+  status: 'idle' | 'generating' | 'complete' | 'error';
+  message: string;
+  error?: string;
+  designSystem?: any;
+  sections?: Record<string, any>;
+  progress?: number;
 }
 
 interface ScreenGenerationState {
@@ -125,14 +165,15 @@ interface GenerationStateData {
 
 interface UseProjectSocketReturn {
   isConnected: boolean;
+  isProjectJoined: boolean;
   isReconnecting: boolean;
   connectionError: string | null;
 
   chatState: ChatState;
-  sendMessage: (message: string, screenId?: string, parentScreenId?: string, planMode?: boolean) => void;
+  sendMessage: (message: string, screenId?: string, parentScreenId?: string, planMode?: boolean, enabledFeatures?: string[], imageUrls?: string[], modelId?: string, planId?: string) => void;
 
   screenStates: Map<string, ScreenState>;
-  startGeneration: (params: GenerationStartParams) => void;
+  startGeneration: (params: GenerationStartParams) => Promise<void>;
   cancelGeneration: (screenIds?: string[]) => void;
 
   // Multi-file generation
@@ -140,15 +181,24 @@ interface UseProjectSocketReturn {
   startMultiFileGeneration: (params: MultiFileStartParams) => void;
   modifyMultiFile: (params: MultiFileModifyParams) => void;
 
+  // Action logs
+  actionLogs: ActionLogEvent[];
+  isActionLogActive: boolean;
+
   onScreenComplete: (callback: (data: ScreenCompleteData) => void) => void;
   onScreenError: (callback: (data: ScreenErrorData) => void) => void;
   onChatComplete: (callback: (data: ChatCompleteData) => void) => void;
   onChatError: (callback: (error: string, code?: string) => void) => void;
   retryScreen: (screen: { name: string; purpose: string; layoutDescription: string; skeletonId: string }) => void;
+
+  // Design system generation
+  designSystemState: DesignSystemState;
+  generateDesignSystem: (params: DesignSystemGenerateParams) => void;
 }
 
 export function useProjectSocket(projectId: string | undefined, wsUrl?: string): UseProjectSocketReturn {
   const [isConnected, setIsConnected] = useState(false);
+  const [isProjectJoined, setIsProjectJoined] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   
@@ -169,14 +219,45 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
     error: null,
   });
 
+  // Action log state
+  const [actionLogs, setActionLogs] = useState<ActionLogEvent[]>([]);
+  const [isActionLogActive, setIsActionLogActive] = useState(false);
+
+  // Design system state
+  const [designSystemState, setDesignSystemState] = useState<DesignSystemState>({
+    status: 'idle',
+    message: '',
+  });
+
   const socketRef = useRef<Socket | null>(null);
   const screenCompleteCallbackRef = useRef<((data: ScreenCompleteData) => void) | null>(null);
   const screenErrorCallbackRef = useRef<((data: ScreenErrorData) => void) | null>(null);
   const chatCompleteCallbackRef = useRef<((data: ChatCompleteData) => void) | null>(null);
+  const pendingChatCompleteRef = useRef<ChatCompleteData[]>([]);
   const chatErrorCallbackRef = useRef<((error: string, code?: string) => void) | null>(null);
+  const pendingChatErrorRef = useRef<Array<{ error: string; code?: string }>>([]);
   
   const activeGenerationIdRef = useRef<string | null>(null);
   const hasRequestedSyncRef = useRef(false);
+  const pendingGenerationStartRef = useRef<{
+    resolve: () => void;
+    reject: (error: Error) => void;
+    timeoutId: ReturnType<typeof setTimeout>;
+  } | null>(null);
+
+  const clearPendingGenerationStart = useCallback((error?: Error) => {
+    const pending = pendingGenerationStartRef.current;
+    if (!pending) return;
+
+    clearTimeout(pending.timeoutId);
+    pendingGenerationStartRef.current = null;
+
+    if (error) {
+      pending.reject(error);
+    } else {
+      pending.resolve();
+    }
+  }, []);
 
   useEffect(() => {
     if (!projectId) return;
@@ -196,6 +277,7 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
 
       socket.on('connected', (data: { sessionId: string; projectId: string; userId: string }) => {
         console.log('[Socket] Authenticated:', data);
+        setIsProjectJoined(true);
         
         if (activeGenerationIdRef.current && !hasRequestedSyncRef.current) {
           console.log('[Socket] Requesting generation state sync after reconnect');
@@ -207,7 +289,9 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
       socket.on('disconnect', (reason) => {
         console.log('[Socket] Disconnected:', reason);
         setIsConnected(false);
+        setIsProjectJoined(false);
         hasRequestedSyncRef.current = false;
+        clearPendingGenerationStart(new Error('Socket disconnected before generation could start'));
         if (reason === 'io server disconnect') {
           setConnectionError('Server disconnected');
         }
@@ -297,7 +381,38 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
           status: '',
           statusMessage: '',
         });
-        chatCompleteCallbackRef.current?.(data);
+        setIsActionLogActive(false);
+        // Finalize ai:progress-driven multiFileState so the indicator shows "Done"
+        setMultiFileState(prev => {
+          if (!prev.isGenerating && prev.files.size === 0) return prev;
+          const files = new Map(prev.files);
+          for (const [path, state] of files) {
+            if (!state.isComplete) files.set(path, { ...state, isComplete: true });
+          }
+          return {
+            ...prev,
+            isGenerating: false,
+            files,
+            currentFile: null,
+            progress: { completed: files.size, total: files.size },
+          };
+        });
+        // Use server-side canonical action logs if provided, otherwise force-complete remaining
+        if (data.actionLogs && data.actionLogs.length > 0) {
+          setActionLogs(data.actionLogs);
+        } else {
+          setActionLogs(prev => prev.map(a =>
+            a.status === 'started'
+              ? { ...a, status: ActionLogStatus.COMPLETED, timestamp: Date.now() }
+              : a
+          ));
+        }
+        if (chatCompleteCallbackRef.current) {
+          chatCompleteCallbackRef.current(data);
+        } else {
+          // Buffer the event — callback may not be registered yet (race condition)
+          pendingChatCompleteRef.current.push(data);
+        }
       });
 
       socket.on('chat:error', (data: { error: string; code?: string }) => {
@@ -307,7 +422,73 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
           status: 'error',
           statusMessage: data.error,
         }));
-        chatErrorCallbackRef.current?.(data.error, data.code);
+        setIsActionLogActive(false);
+        // Clear ai:progress-driven multiFileState on error
+        setMultiFileState(prev => {
+          if (!prev.isGenerating && prev.files.size === 0) return prev;
+          return {
+            ...prev,
+            isGenerating: false,
+            currentFile: null,
+            error: data.error,
+          };
+        });
+        // Force-complete any remaining "started" actions on error
+        setActionLogs(prev => prev.map(a =>
+          a.status === 'started'
+            ? { ...a, status: ActionLogStatus.FAILED, timestamp: Date.now() }
+            : a
+        ));
+        if (chatErrorCallbackRef.current) {
+          chatErrorCallbackRef.current(data.error, data.code);
+        } else {
+          pendingChatErrorRef.current.push({ error: data.error, code: data.code });
+        }
+      });
+
+      // ---------- Action log events ----------
+      socket.on('action:log', (data: ActionLogEvent) => {
+        setIsActionLogActive(true);
+        setActionLogs(prev => {
+          // If this is an update (completed/failed), find & update the existing entry
+          if (data.status !== 'started') {
+            // First try exact ID match
+            let idx = prev.findIndex(a => a.id === data.id);
+            // Fallback: match by type + fileName to handle duplicate IDs from different emitters
+            if (idx === -1 && data.metadata?.fileName) {
+              idx = prev.findIndex(
+                a => a.status === 'started' && a.type === data.type && a.metadata?.fileName === data.metadata?.fileName
+              );
+            }
+            if (idx !== -1) {
+              const updated = [...prev];
+              updated[idx] = { ...updated[idx], ...data };
+              return updated;
+            }
+            // No matching started entry - just add as completed (don't create a duplicate)
+            return [...prev, data];
+          }
+          // New started action - check for duplicate (same type + fileName already started)
+          if (data.metadata?.fileName) {
+            const existingIdx = prev.findIndex(
+              a => a.status === 'started' && a.type === data.type && a.metadata?.fileName === data.metadata?.fileName
+            );
+            if (existingIdx !== -1) {
+              // Already tracking this file - skip duplicate
+              return prev;
+            }
+          }
+          return [...prev, data];
+        });
+      });
+
+      // Replay cached action logs on reconnect
+      socket.on('action:log:history', (logs: ActionLogEvent[]) => {
+        if (logs && logs.length > 0) {
+          console.log('[Socket] Received action log history:', logs.length, 'entries');
+          setIsActionLogActive(true);
+          setActionLogs(logs);
+        }
       });
 
       socket.on('screen:queued', (data: { screenId: string; tempId: string; skeletonId?: string; index: number; name: string; position: number; total: number }) => {
@@ -377,6 +558,7 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
 
       socket.on('screen:error', (data: ScreenErrorData) => {
         console.log('[Socket] screen:error received:', data);
+        clearActiveGeneration();
         setScreenStates(prev => {
           const next = new Map(prev);
           const key = data.tempId || data.screenId;
@@ -394,6 +576,8 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
       socket.on('generation:started', (data: { generationId: string; screens: Array<{ tempId: string; skeletonId?: string; index: number; name: string }>; total: number }) => {
         console.log('[Socket] Generation started:', data.generationId, 'screens:', data.total);
         activeGenerationIdRef.current = data.generationId;
+        trackActiveGeneration(data.generationId);
+        clearPendingGenerationStart();
         
         data.screens.forEach(screen => {
           setScreenStates(prev => {
@@ -413,21 +597,36 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
         if (activeGenerationIdRef.current === data.generationId) {
           activeGenerationIdRef.current = null;
         }
+        clearActiveGeneration();
+        setIsActionLogActive(false);
+        // Force-complete any remaining "started" actions
+        setActionLogs(prev => prev.map(a =>
+          a.status === 'started'
+            ? { ...a, status: ActionLogStatus.COMPLETED, timestamp: Date.now() }
+            : a
+        ));
       });
 
       // ---------- Multi-file generation events ----------
-      socket.on('generation:multi:started', (data: { generationId: string; totalFiles: number; files: string[] }) => {
-        console.log('[Socket] Multi-file generation started:', data.generationId, 'files:', data.totalFiles);
+      socket.on('generation:multi:started', (data: { generationId?: string; totalFiles?: number; screenCount?: number; files?: string[] }) => {
+        const total = data.totalFiles || data.screenCount || 0;
+        const fileList = data.files || [];
+        console.log('[Socket] Multi-file generation started:', data.generationId, 'files:', total);
+        if (data.generationId) trackActiveGeneration(data.generationId);
+        clearPendingGenerationStart();
         setMultiFileState({
           isGenerating: true,
-          files: new Map(data.files.map(f => [f, { content: '', isComplete: false }])),
+          files: new Map(fileList.map(f => [f, { content: '', isComplete: false }])),
           currentFile: null,
-          progress: { completed: 0, total: data.totalFiles },
+          progress: { completed: 0, total },
           error: null,
+          summary: null,
+          validation: null,
         });
       });
 
-      socket.on('generation:file:start', (data: { filePath: string; index: number; total: number }) => {
+      socket.on('generation:file:start', (data: { filePath: string; index: number; total: number; seq?: number }) => {
+        if (data.seq != null) updateLastSeq(data.seq);
         console.log('[Socket] File generation started:', data.filePath, `(${data.index + 1}/${data.total})`);
         setMultiFileState(prev => {
           const files = new Map(prev.files);
@@ -442,7 +641,8 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
         });
       });
 
-      socket.on('generation:file:chunk', (data: { filePath: string; chunk: string; accumulated?: string }) => {
+      socket.on('generation:file:chunk', (data: { filePath: string; chunk: string; accumulated?: string; seq?: number }) => {
+        if (data.seq != null) updateLastSeq(data.seq);
         setMultiFileState(prev => {
           const files = new Map(prev.files);
           const existing = files.get(data.filePath) || { content: '', isComplete: false };
@@ -454,11 +654,12 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
         });
       });
 
-      socket.on('generation:file:complete', (data: { filePath: string; content: string; index: number }) => {
+      socket.on('generation:file:complete', (data: { filePath: string; content?: string; fullContent?: string; index: number; seq?: number }) => {
+        if (data.seq != null) updateLastSeq(data.seq);
         console.log('[Socket] File generation complete:', data.filePath);
         setMultiFileState(prev => {
           const files = new Map(prev.files);
-          files.set(data.filePath, { content: data.content, isComplete: true });
+          files.set(data.filePath, { content: data.content || data.fullContent || '', isComplete: true });
           const completed = Array.from(files.values()).filter(f => f.isComplete).length;
           return {
             ...prev,
@@ -468,8 +669,21 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
         });
       });
 
-      socket.on('generation:multi:complete', (data: { generationId: string; files: Array<{ filePath: string; content: string }> }) => {
+      socket.on('generation:multi:complete', (data: {
+        generationId: string;
+        messageId?: string;
+        files: Array<{ filePath: string; content: string }>;
+        summary?: string;
+        validation?: Array<{
+          screenId?: string;
+          screenName?: string;
+          status: 'passed' | 'failed' | 'skipped';
+          errors?: string[];
+        }>;
+        actionLogs?: ActionLogEvent[];
+      }) => {
         console.log('[Socket] Multi-file generation complete:', data.generationId, 'files:', data.files.length);
+        clearActiveGeneration();
         setMultiFileState(prev => {
           const files = new Map(prev.files);
           // Ensure all files are stored with final content
@@ -482,12 +696,31 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
             currentFile: null,
             progress: { completed: files.size, total: files.size },
             error: null,
+            summary: data.summary || null,
+            validation: data.validation || null,
+            completedMessageId: data.messageId || null,
+            completedActionLogs: data.actionLogs || null,
           };
         });
+        // Mark action log as inactive and force-complete any remaining started actions
+        setIsActionLogActive(false);
+        if (data.actionLogs && data.actionLogs.length > 0) {
+          // Use server-side canonical action logs (already deduplicated)
+          setActionLogs(data.actionLogs);
+        } else {
+          // Force-complete any remaining "started" actions
+          setActionLogs(prev => prev.map(a =>
+            a.status === 'started'
+              ? { ...a, status: ActionLogStatus.COMPLETED, timestamp: Date.now() }
+              : a
+          ));
+        }
       });
 
       socket.on('generation:multi:error', (data: { generationId?: string; error: string; code?: string }) => {
         console.error('[Socket] Multi-file generation error:', data.error);
+        clearActiveGeneration();
+        clearPendingGenerationStart(new Error(data.error));
         if (data.code === 'INSUFFICIENT_CREDITS' || data.code === 'DAILY_LIMIT_EXCEEDED' || data.code === 'LIMIT_EXCEEDED') {
           const { handleBillingError, currentPlan } = useBillingStore.getState();
           handleBillingError(data.code, data.error, currentPlan, data as any);
@@ -497,6 +730,120 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
           isGenerating: false,
           error: data.error,
         }));
+        setIsActionLogActive(false);
+        // Force-fail any remaining "started" actions on error
+        setActionLogs(prev => prev.map(a =>
+          a.status === 'started'
+            ? { ...a, status: ActionLogStatus.FAILED, timestamp: Date.now(), metadata: { ...a.metadata, error: data.error } }
+            : a
+        ));
+      });
+
+      // ---------- Streaming resume events ----------
+      // On reconnect, backend replays missed events via this channel
+      socket.on('generation:stream-event', (data: { type: string; filePath?: string; fullContent?: string; index?: number; total?: number; seq?: number; phase?: string; message?: string }) => {
+        if (data.seq != null) updateLastSeq(data.seq);
+        // Replay file:complete events into multiFileState
+        if (data.type === 'file:complete' && data.filePath) {
+          setMultiFileState(prev => {
+            const files = new Map(prev.files);
+            files.set(data.filePath!, { content: data.fullContent || '', isComplete: true });
+            const completed = Array.from(files.values()).filter(f => f.isComplete).length;
+            return { ...prev, files, progress: { ...prev.progress, completed } };
+          });
+        }
+      });
+
+      socket.on('generation:resume-empty', (data: { generationId: string; message: string }) => {
+        console.log('[Socket] Resume empty:', data.message);
+        clearActiveGeneration();
+      });
+
+      // ---------- Structured AI progress events ----------
+      // The backend emits 'ai:progress' for per-file progress during generation.
+      // Feed these into multiFileState so ChatProgressIndicator can display them.
+      socket.on('ai:progress', (data: { type: string; task: string; status: 'pending' | 'in_progress' | 'completed'; index: number; total: number; timestamp: number }) => {
+        setMultiFileState(prev => {
+          // Don't overwrite an already-active multi-file generation that was
+          // started via generation:multi:started — those have their own
+          // file:start / file:complete flow.
+          // ai:progress fires for BOTH multi-file and single-screen agentic
+          // generations, but we only need to synthesize state when the
+          // multi-file pipeline didn't already set isGenerating.
+          const files = new Map(prev.files);
+          const filePath = data.task;
+
+          if (data.status === 'in_progress') {
+            if (!files.has(filePath)) {
+              files.set(filePath, { content: '', isComplete: false });
+            }
+            return {
+              ...prev,
+              isGenerating: true,
+              files,
+              currentFile: filePath,
+              progress: { completed: data.index, total: data.total },
+            };
+          }
+
+          if (data.status === 'completed') {
+            const existing = files.get(filePath);
+            if (existing) {
+              files.set(filePath, { ...existing, isComplete: true });
+            } else {
+              files.set(filePath, { content: '', isComplete: true });
+            }
+            const completed = data.index + 1;
+            const isDone = completed >= data.total;
+            return {
+              ...prev,
+              isGenerating: !isDone,
+              files,
+              currentFile: isDone ? null : prev.currentFile,
+              progress: { completed, total: data.total },
+            };
+          }
+
+          // 'pending' status — just register the file
+          if (!files.has(filePath)) {
+            files.set(filePath, { content: '', isComplete: false });
+          }
+          return {
+            ...prev,
+            isGenerating: true,
+            files,
+            progress: { ...prev.progress, total: data.total },
+          };
+        });
+      });
+
+      // ---------- Design system generation events ----------
+      socket.on('design-system:status', (data: { status: string; message: string }) => {
+        setDesignSystemState({ status: 'generating', message: data.message });
+      });
+
+      socket.on('design-system:section', (data: { section: string; data: any; progress: number }) => {
+        setDesignSystemState(prev => ({
+          ...prev,
+          status: 'generating',
+          message: `Planning: ${data.section}...`,
+          sections: { ...(prev.sections || {}), [data.section]: data.data },
+          progress: data.progress,
+        }));
+      });
+
+      socket.on('design-system:complete', (data: { designSystem: any; cost: number }) => {
+        setDesignSystemState({ status: 'complete', message: 'Planning complete', designSystem: data.designSystem });
+        setIsActionLogActive(false);
+      });
+
+      socket.on('design-system:error', (data: { error: string; code?: string }) => {
+        setDesignSystemState({ status: 'error', message: data.error, error: data.error });
+        setIsActionLogActive(false);
+        if (data.code === 'INSUFFICIENT_CREDITS' || data.code === 'DAILY_LIMIT_EXCEEDED') {
+          const { handleBillingError, currentPlan } = useBillingStore.getState();
+          handleBillingError(data.code, data.error, currentPlan, data as any);
+        }
       });
 
       socket.on('credits:update', (data: { balance: number }) => {
@@ -510,12 +857,13 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
     }
 
     return () => {
+      clearPendingGenerationStart(new Error('Socket connection cleaned up'));
       disconnectSocket();
       socketRef.current = null;
     };
-  }, [projectId, wsUrl]);
+  }, [projectId, wsUrl, clearPendingGenerationStart]);
 
-  const sendMessage = useCallback((message: string, screenId?: string, parentScreenId?: string, planMode?: boolean) => {
+  const sendMessage = useCallback((message: string, screenId?: string, parentScreenId?: string, planMode?: boolean, enabledFeatures?: string[], imageUrls?: string[], modelId?: string, planId?: string) => {
     if (!socketRef.current?.connected) {
       chatErrorCallbackRef.current?.('Not connected to server', 'NOT_CONNECTED');
       return;
@@ -528,21 +876,44 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
       statusMessage: 'Sending...',
     });
 
-    socketRef.current.emit('chat:send', { message, screenId, parentScreenId, planMode });
+    // Reset action logs for new conversation turn
+    setActionLogs([]);
+    setIsActionLogActive(true);
+    // NOTE: Do NOT reset multiFileState here — it kills the preview overlay.
+    // multiFileState is reset naturally by chat:complete / chat:error handlers.
+
+    socketRef.current.emit('chat:send', { message, screenId, parentScreenId, planMode, enabledFeatures, imageUrls, modelId, planId });
   }, []);
 
   const startGeneration = useCallback((params: GenerationStartParams) => {
     console.log('[Socket] startGeneration called', { connected: socketRef.current?.connected, screenCount: params.screens.length });
     if (!socketRef.current?.connected) {
+      const error = new Error('Not connected to server');
       console.error('[Socket] Cannot start generation - not connected');
-      return;
+      setConnectionError(error.message);
+      return Promise.reject(error);
     }
-    
+
+    if (pendingGenerationStartRef.current) {
+      clearPendingGenerationStart(new Error('A generation start request is already pending'));
+    }
+
     activeGenerationIdRef.current = null;
     hasRequestedSyncRef.current = false;
-    
-    socketRef.current.emit('generation:start', params);
-  }, []);
+
+    return new Promise<void>((resolve, reject) => {
+      pendingGenerationStartRef.current = {
+        resolve,
+        reject,
+        timeoutId: setTimeout(() => {
+          pendingGenerationStartRef.current = null;
+          reject(new Error('Timed out waiting for generation to start'));
+        }, 15000),
+      };
+
+      socketRef.current?.emit('generation:start', { ...params, modelId: params.modelId });
+    });
+  }, [clearPendingGenerationStart]);
 
   const cancelGeneration = useCallback((screenIds?: string[]) => {
     if (!socketRef.current?.connected) return;
@@ -560,10 +931,34 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
 
   const onChatComplete = useCallback((callback: (data: ChatCompleteData) => void) => {
     chatCompleteCallbackRef.current = callback;
+    // Replay buffered events that arrived before callback was registered.
+    // Use queueMicrotask so the calling component's useEffect has finished
+    // and refs (e.g. assistantMessageIdRef) are set before we deliver.
+    if (pendingChatCompleteRef.current.length > 0) {
+      const buffered = [...pendingChatCompleteRef.current];
+      pendingChatCompleteRef.current = [];
+      queueMicrotask(() => {
+        for (const data of buffered) {
+          chatCompleteCallbackRef.current?.(data);
+        }
+      });
+    }
   }, []);
 
   const onChatError = useCallback((callback: (error: string, code?: string) => void) => {
     chatErrorCallbackRef.current = callback;
+    // Replay buffered errors that arrived before callback was registered.
+    // Use queueMicrotask so the calling component's useEffect has finished
+    // and refs (e.g. assistantMessageIdRef) are set before we deliver.
+    if (pendingChatErrorRef.current.length > 0) {
+      const buffered = [...pendingChatErrorRef.current];
+      pendingChatErrorRef.current = [];
+      queueMicrotask(() => {
+        for (const item of buffered) {
+          chatErrorCallbackRef.current?.(item.error, item.code);
+        }
+      });
+    }
   }, []);
 
   const startMultiFileGeneration = useCallback((params: MultiFileStartParams) => {
@@ -580,9 +975,13 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
       currentFile: null,
       progress: { completed: 0, total: params.screens.length },
       error: null,
+      summary: null,
+      validation: null,
     });
+    setActionLogs([]);
+    setIsActionLogActive(true);
 
-    socketRef.current.emit('generation:multi:start', params);
+    socketRef.current.emit('generation:multi:start', { ...params, modelId: params.modelId });
   }, []);
 
   const modifyMultiFile = useCallback((params: MultiFileModifyParams) => {
@@ -592,14 +991,30 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
       return;
     }
 
+    const userRequest = params.userRequest || params.prompt;
+    if (!userRequest?.trim()) {
+      console.error('[Socket] Cannot modify multi-file - missing userRequest');
+      return;
+    }
+
     setMultiFileState(prev => ({
       ...prev,
       isGenerating: true,
+      files: new Map(),
+      progress: { completed: 0, total: 0 },
       error: null,
       currentFile: null,
+      summary: null,
+      validation: null,
     }));
+    setActionLogs([]);
+    setIsActionLogActive(true);
 
-    socketRef.current.emit('generation:multi:modify', params);
+    socketRef.current.emit('generation:multi:modify', {
+      userRequest,
+      targetFiles: params.targetFiles,
+      modelId: params.modelId,
+    });
   }, []);
 
   const retryScreen = useCallback((screen: { name: string; purpose: string; layoutDescription: string; skeletonId: string }) => {
@@ -611,8 +1026,21 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
     socketRef.current.emit('generation:retry', { screen });
   }, []);
 
+  const generateDesignSystem = useCallback((params: DesignSystemGenerateParams) => {
+    if (!socketRef.current?.connected) {
+      console.error('[Socket] Cannot generate design system - not connected');
+      return;
+    }
+    console.log('[Socket] Starting design system generation via socket');
+    setDesignSystemState({ status: 'generating', message: 'Planning your app...' });
+    setActionLogs([]);
+    setIsActionLogActive(true);
+    socketRef.current.emit('design-system:generate', params);
+  }, []);
+
   return {
     isConnected,
+    isProjectJoined,
     isReconnecting,
     connectionError,
     chatState,
@@ -623,10 +1051,14 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
     multiFileState,
     startMultiFileGeneration,
     modifyMultiFile,
+    actionLogs,
+    isActionLogActive,
     onScreenComplete,
     onScreenError,
     onChatComplete,
     onChatError,
     retryScreen,
+    designSystemState,
+    generateDesignSystem,
   };
 }

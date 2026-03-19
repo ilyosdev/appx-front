@@ -4,19 +4,27 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  lazy,
+  Suspense,
 } from "react";
 import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import type { DesignSystem } from "@/lib/design-system";
-import { useProjectSocket, type ScreenCompleteData, type ScreenErrorData } from "@/hooks/useProjectSocket";
+import { useProjectSocket, type ScreenCompleteData, type ScreenErrorData, type DesignSystemGenerateParams } from "@/hooks/useProjectSocket";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
+import { useResizablePanel, ResizeHandle } from "@/hooks/useResizablePanel";
 import {
   Sparkles,
   MessageSquare,
   Loader2,
   AlertCircle,
   CheckCircle,
+  Smartphone,
+  QrCode,
+  FileCode,
+  FolderTree,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 import { projectsApi, type DesignSystemCustomization } from "@/lib/projects";
 import { DesignSystemCustomizer } from "@/components/projects/DesignSystemCustomizer";
@@ -27,6 +35,8 @@ import { generateScreenThumbnail } from "@/lib/screenshot";
 import { api, projectsApi as projectsApiClient } from "@/lib/api";
 import { isReactCode } from "@/lib/codeUtils";
 import { slugify } from "@/lib/slugify";
+import { useProjectFiles } from "@/hooks/useProjectFiles";
+import { PLAN_FEATURES, type PlanType } from "@/lib/payments";
 
 import {
   layoutScreens,
@@ -39,22 +49,264 @@ import type { ScreenData, RecommendationItem } from "@/types/canvas";
 
 import { CanvasHeader } from "@/components/canvas/CanvasHeader";
 import { ChatSidebar } from "@/components/canvas/ChatSidebar";
-import { ScreenListPanel } from "@/components/canvas/ScreenListPanel";
 import { PhonePreviewPanel } from "@/components/canvas/PhonePreviewPanel";
 import { ExportModal } from "@/components/canvas/ExportModal";
 import { ProjectSettingsModal } from "@/components/canvas/ProjectSettingsModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { ExpoPreviewModal } from "@/components/preview/ExpoPreviewModal";
 import { WebPreview } from "@/components/preview/WebPreview";
-import { useExpoPreviewStore } from "@/stores/expoPreviewStore";
+import { PreviewConsole } from "@/components/preview/PreviewConsole";
 import { PlanApprovalModal } from "@/components/canvas/PlanApprovalModal";
 import { VersionHistoryModal } from "@/components/canvas/VersionHistoryModal";
 import { TestPanel } from "@/components/project/TestPanel";
+import { DesignSystemPanel } from "@/components/canvas/DesignSystemPanel";
+
+const MonacoEditor = lazy(() => import("@monaco-editor/react").then(m => ({ default: m.default })));
+
+/** Draggable PiP phone preview for Code tab.
+ *  Renders content at real device resolution (393x852) and CSS-scales it down.
+ *  Scroll wheel changes scale; drag to move. */
+function PiPPreview({ children, onClose, onRefresh }: {
+  children: React.ReactNode;
+  onClose: () => void;
+  onRefresh: () => void;
+}) {
+  const DEVICE_W = 393;
+  const DEVICE_H = 852;
+  const BEZEL = 12;
+  const FRAME_W = DEVICE_W + BEZEL * 2;
+  const FRAME_H = DEVICE_H + BEZEL * 2;
+
+  const pipRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ x: -1, y: -1 });
+  const [pipScale, setPipScale] = useState(0.35);
+  const dragging = useRef(false);
+  const resizing = useRef(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+
+  const displayW = Math.round(FRAME_W * pipScale);
+  const displayH = Math.round(FRAME_H * pipScale);
+
+  useEffect(() => {
+    if (pos.x === -1 && pipRef.current?.parentElement) {
+      const parent = pipRef.current.parentElement.getBoundingClientRect();
+      setPos({ x: parent.width - displayW - 16, y: parent.height - displayH - 16 });
+    }
+  }, [pos.x, displayW, displayH]);
+
+  const onDragStart = useCallback((e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return;
+    dragging.current = true;
+    const rect = pipRef.current!.getBoundingClientRect();
+    dragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    e.preventDefault();
+    const onMove = (ev: MouseEvent) => {
+      if (!dragging.current || !pipRef.current?.parentElement) return;
+      const parent = pipRef.current.parentElement.getBoundingClientRect();
+      setPos({
+        x: Math.max(0, Math.min(ev.clientX - parent.left - dragOffset.current.x, parent.width - displayW)),
+        y: Math.max(0, Math.min(ev.clientY - parent.top - dragOffset.current.y, parent.height - displayH)),
+      });
+    };
+    const onUp = () => { dragging.current = false; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [displayW, displayH]);
+
+  // Resize by dragging corner — changes scale, not viewport
+  const onResizeStart = useCallback((e: React.MouseEvent) => {
+    resizing.current = true;
+    const startX = e.clientX;
+    const startScale = pipScale;
+    e.preventDefault();
+    e.stopPropagation();
+    const onMove = (ev: MouseEvent) => {
+      if (!resizing.current) return;
+      const dx = ev.clientX - startX;
+      const newScale = Math.max(0.2, Math.min(0.6, startScale + dx / FRAME_W));
+      setPipScale(newScale);
+    };
+    const onUp = () => { resizing.current = false; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [pipScale, FRAME_W]);
+
+  const onWheel = useCallback((e: React.WheelEvent) => {
+    e.stopPropagation();
+    setPipScale(prev => Math.max(0.2, Math.min(0.6, prev - e.deltaY * 0.001)));
+  }, []);
+
+  return (
+    <motion.div
+      ref={pipRef}
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      transition={{ duration: 0.2 }}
+      className="absolute z-30"
+      style={{
+        width: displayW,
+        height: displayH,
+        left: pos.x >= 0 ? pos.x : undefined,
+        top: pos.y >= 0 ? pos.y : undefined,
+        right: pos.x < 0 ? 16 : undefined,
+        bottom: pos.y < 0 ? 16 : undefined,
+      }}
+      onWheel={onWheel}
+    >
+      {/* Resize handle — bottom-right corner */}
+      <div
+        onMouseDown={onResizeStart}
+        className="absolute -bottom-1.5 -right-1.5 w-5 h-5 cursor-se-resize z-30 flex items-end justify-end"
+        title="Drag to resize"
+      >
+        <svg className="w-3.5 h-3.5 text-surface-500" viewBox="0 0 10 10" fill="currentColor">
+          <circle cx="8" cy="8" r="1.2" />
+          <circle cx="8" cy="4.5" r="1.2" />
+          <circle cx="4.5" cy="8" r="1.2" />
+        </svg>
+      </div>
+
+      {/* Action buttons — outside scaled frame so they stay normal size */}
+      <div className="absolute -top-2 -right-2 z-30 flex items-center gap-1">
+        <button onClick={onRefresh} className="p-1.5 rounded-full bg-surface-800 border border-surface-700 text-surface-400 hover:text-white hover:bg-surface-700 transition-colors shadow-lg" title="Reload">
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+        </button>
+        <button onClick={onClose} className="p-1.5 rounded-full bg-surface-800 border border-surface-700 text-surface-400 hover:text-white hover:bg-surface-700 transition-colors shadow-lg" title="Close">
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      {/* Phone rendered at real resolution, scaled down via CSS transform */}
+      <div
+        onMouseDown={onDragStart}
+        className="origin-top-left cursor-grab active:cursor-grabbing"
+        style={{ width: FRAME_W, height: FRAME_H, transform: `scale(${pipScale})` }}
+      >
+        <div className="relative bg-surface-900 rounded-[44px] ring-1 ring-surface-700/50 shadow-2xl shadow-black/60"
+          style={{ width: FRAME_W, height: FRAME_H, padding: BEZEL }}>
+          {/* Dynamic Island */}
+          <div className="absolute top-[14px] left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+            <div className="bg-black rounded-full flex items-center justify-center" style={{ width: 126, height: 37 }}>
+              <div className="w-3 h-3 bg-surface-800 rounded-full ring-1 ring-surface-700/50 ml-auto mr-4" />
+            </div>
+          </div>
+          {/* Screen — real device resolution */}
+          <div className="bg-white overflow-hidden" style={{ width: DEVICE_W, height: DEVICE_H, borderRadius: 38 }}>
+            {children}
+          </div>
+          {/* Home indicator */}
+          <div className="absolute bottom-[8px] left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+            <div className="bg-white/30 rounded-full" style={{ width: 134, height: 5, borderRadius: 2.5 }} />
+          </div>
+          {/* Side buttons */}
+          <div className="absolute -right-[2px] bg-surface-700 rounded-r-sm" style={{ top: 120, width: 3, height: 64 }} />
+          <div className="absolute -left-[2px] bg-surface-700 rounded-l-sm" style={{ top: 100, width: 3, height: 32 }} />
+          <div className="absolute -left-[2px] bg-surface-700 rounded-l-sm" style={{ top: 145, width: 3, height: 32 }} />
+          <div className="absolute -left-[2px] bg-surface-700 rounded-l-sm" style={{ top: 70, width: 3, height: 16 }} />
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 interface LocationState {
   designSystem?: DesignSystem;
   isNewProject?: boolean;
   showPlanApproval?: boolean;
+  pendingDesignSystem?: DesignSystemGenerateParams;
+}
+
+function normalizeScreenNameForMatching(name: string): string {
+  return name.toLowerCase().replace(/[_\s-]+/g, "");
+}
+
+function getScreenNameFromExpoFilePath(filePath: string): string | null {
+  const normalizedPath = filePath.replace(/^\//, "");
+  if (
+    !normalizedPath.startsWith("app/") ||
+    !normalizedPath.endsWith(".tsx") ||
+    normalizedPath.includes("_layout")
+  ) {
+    return null;
+  }
+
+  let route = normalizedPath
+    .replace(/^app\//, "")
+    .replace(/\.tsx$/, "")
+    .replace(/\([^)]+\)\//g, "");
+
+  if (!route || route === "+not-found") return null;
+  if (/\[[^\]]+\]/.test(route) && !route.endsWith("/index")) return null;
+
+  if (route === "index" || route.endsWith("/index")) {
+    route = route.replace(/\/index$/, "");
+    if (!route) return "Home";
+  }
+
+  const segments = route.split("/").filter(Boolean);
+  const rawName = segments[segments.length - 1];
+  if (!rawName) return null;
+
+  return rawName
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+interface InitialGenerationScreenPlan {
+  name: string;
+  purpose: string;
+  layoutDescription: string;
+  dataModel?: string;
+  interactions?: string;
+  stateManagement?: string;
+  skeletonId: string;
+}
+
+interface InitialGenerationPlan {
+  designSystem: DesignSystem;
+  screens: InitialGenerationScreenPlan[];
+}
+
+function buildInitialGenerationPlan(designSystem: DesignSystem): InitialGenerationPlan {
+  return {
+    designSystem,
+    screens: designSystem.screens.map((config, index) => ({
+      name: config.name,
+      purpose: config.purpose,
+      layoutDescription: config.layoutDescription,
+      dataModel: config.dataModel,
+      interactions: config.interactions,
+      stateManagement: config.stateManagement,
+      skeletonId: `skeleton-${index}-${config.id}`,
+    })),
+  };
+}
+
+function createInitialSkeletonScreens(plan: InitialGenerationPlan): ScreenData[] {
+  return plan.screens.map((config, index) => ({
+    id: config.skeletonId,
+    name: config.name,
+    type: "custom",
+    parentScreenId: null,
+    imageUrl: null,
+    thumbnailUrl: null,
+    htmlContent: null,
+    aiPrompt: config.purpose,
+    createdAt: null,
+    updatedAt: null,
+    x: 100 + index * SCREEN_SPACING_X,
+    y: 100,
+    width: DEVICE_WIDTH,
+    height: DEVICE_HEIGHT,
+    visible: true,
+    isLoading: true,
+    loadingText: `Generating ${config.name}...`,
+    screenNameForMatching: config.name,
+    generationIndex: index,
+    skeletonId: config.skeletonId,
+  }));
 }
 
 export default function ProjectPage() {
@@ -73,6 +325,14 @@ export default function ProjectPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // ---------- UI state ----------
+  const [centerTab, setCenterTab] = useState<'preview' | 'code'>('preview');
+  const [showCodePreview, setShowCodePreview] = useState(true);
+  const [pipRefreshKey, setPipRefreshKey] = useState(0);
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [dirtyFiles, setDirtyFiles] = useState<Record<string, string>>({});
+  const [savingFile, setSavingFile] = useState<string | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [mobileTab, setMobileTab] = useState<'chat' | 'preview' | 'test'>('chat');
   const [showExportModal, setShowExportModal] = useState(false);
   const [publishModalOpen, setPublishModalOpen] = useState(false);
   const [triggerMessage, setTriggerMessage] = useState<string | undefined>();
@@ -81,6 +341,11 @@ export default function ProjectPage() {
   const [_isGeneratingVariation, setIsGeneratingVariation] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [designSystemOpen, setDesignSystemOpen] = useState(false);
+  const chatResize = useResizablePanel({ defaultWidth: 380, minWidth: 280, maxWidth: 550, storageKey: 'appx-chat-width' });
+  const rightResize = useResizablePanel({ defaultWidth: 280, minWidth: 200, maxWidth: 450, storageKey: 'appx-right-width' });
+  const chatWidth = chatResize.width;
+  const rightWidth = rightResize.width;
+  const [showDesignSystemPanel, setShowDesignSystemPanel] = useState(false);
   const [progressMessages] = useState<Map<string, unknown>>(new Map());
   const [initialRecommendations, setInitialRecommendations] = useState<{
     essential: RecommendationItem[];
@@ -109,6 +374,11 @@ export default function ProjectPage() {
     multiFileState,
     startMultiFileGeneration,
     modifyMultiFile,
+    actionLogs,
+    isActionLogActive,
+    designSystemState,
+    generateDesignSystem,
+    isProjectJoined,
   } = useProjectSocket(projectId);
 
   // ---------- Thumbnail generation ----------
@@ -251,21 +521,6 @@ export default function ProjectPage() {
         generateAndUploadThumbnail(data.screenId, data.html);
       }
 
-      // Auto-sync to expo preview if enabled
-      const expoStore = useExpoPreviewStore.getState();
-      if (expoStore.autoPreview && projectId) {
-        const expoSession = expoStore.sessions.get(projectId);
-        if (expoSession) {
-          const newCode = data.reactNativeCode || data.html;
-          if (newCode) {
-            api.patch(`/expo-preview/sessions/${expoSession.sessionId}`, {
-              reactNativeCode: newCode,
-            }, { timeout: 60000 }).catch(err => {
-              console.error('[Expo Auto-Sync] Failed:', err.message);
-            });
-          }
-        }
-      }
     });
   }, [onScreenComplete, projectId, queryClient, generateAndUploadThumbnail]);
 
@@ -325,6 +580,117 @@ export default function ProjectPage() {
 
   const isRNProject = project?.generationTarget === 'rn';
   isRNProjectRef.current = isRNProject;
+
+  // ---------- Project files for web preview ----------
+  const { data: projectFiles } = useQuery({
+    queryKey: ['project-files', projectId],
+    queryFn: async () => {
+      if (!projectId) throw new Error('Project ID required');
+      const response = await api.get(`/projects/${projectId}/files`);
+      return response.data.data || response.data;
+    },
+    enabled: !!projectId,
+  });
+
+  const filesMap = useMemo(() => {
+    if (!projectFiles?.length) return undefined;
+    const map: Record<string, string> = {};
+    for (const f of projectFiles) {
+      const key = f.path.startsWith('/') ? f.path.slice(1) : f.path;
+      map[key] = f.content;
+    }
+    return map;
+  }, [projectFiles]);
+
+  // ---------- Editable code tab ----------
+  const { saveFile } = useProjectFiles(projectId);
+  const user = useAuthStore((s) => s.user);
+  const userPlan = (user?.plan as PlanType) || 'free';
+  const canEditCode = PLAN_FEATURES[userPlan].codeExport;
+
+  const selectedFileId = useMemo(() => {
+    if (!selectedFile || !projectFiles?.length) return null;
+    const f = projectFiles.find((f: { path: string; id: string }) => f.path === selectedFile);
+    return f?.id ?? null;
+  }, [selectedFile, projectFiles]);
+
+  const handleEditorChange = useCallback((value: string | undefined) => {
+    if (!selectedFile || !value || !canEditCode) return;
+    setDirtyFiles(prev => ({ ...prev, [selectedFile]: value }));
+    // Debounced auto-save after 1.5s
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      if (!selectedFileId) return;
+      setSavingFile(selectedFile);
+      saveFile(selectedFileId, selectedFile, value).finally(() => {
+        setSavingFile(null);
+        setDirtyFiles(prev => {
+          const next = { ...prev };
+          delete next[selectedFile];
+          return next;
+        });
+      });
+    }, 1500);
+  }, [selectedFile, selectedFileId, canEditCode, saveFile]);
+
+  const handleEditorSave = useCallback(() => {
+    if (!selectedFile || !selectedFileId || !canEditCode) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    const content = dirtyFiles[selectedFile];
+    if (!content) return; // nothing dirty
+    setSavingFile(selectedFile);
+    saveFile(selectedFileId, selectedFile, content).finally(() => {
+      setSavingFile(null);
+      setDirtyFiles(prev => {
+        const next = { ...prev };
+        delete next[selectedFile];
+        return next;
+      });
+    });
+  }, [selectedFile, selectedFileId, canEditCode, dirtyFiles, saveFile]);
+
+  // Derive tab screens from project files when app/(tabs)/*.tsx files exist
+  const tabScreensFromFiles = useMemo(() => {
+    if (!filesMap) return undefined;
+    let tabEntries = Object.entries(filesMap)
+      .filter(([path]) => /^app\/\(tabs\)\/[^/]+\.tsx?$/.test(path))
+      .filter(([path]) => !path.includes("_layout"))
+      .sort(([a], [b]) => {
+        if (a.includes("index.")) return -1;
+        if (b.includes("index.")) return 1;
+        return a.localeCompare(b);
+      });
+
+    // Remove home.tsx if index.tsx exists — index IS the home screen
+    const hasIndex = tabEntries.some(([p]) => p.includes('index.'));
+    if (hasIndex) {
+      tabEntries = tabEntries.filter(([p]) => {
+        const name = (p.split('/').pop() || '').replace(/\.tsx?$/, '').toLowerCase();
+        return name !== 'home';
+      });
+    }
+
+    if (tabEntries.length === 0) return undefined;
+
+    // Parse icon names from _layout.tsx (AI generates <Tabs.Screen name="..." ... <IconName .../>)
+    const layoutCode = filesMap['app/(tabs)/_layout.tsx'] || '';
+    const iconMap: Record<string, string> = {};
+    const iconRegex = /Tabs\.Screen\s+name=["']([^"']+)["'][\s\S]*?tabBarIcon:[\s\S]*?<(\w+)/g;
+    let match;
+    while ((match = iconRegex.exec(layoutCode)) !== null) {
+      iconMap[match[1]] = match[2];
+    }
+
+    return tabEntries.map(([path]) => {
+      const fileName = (path.split("/").pop() || "tab").replace(/\.tsx?$/, "");
+      const name =
+        fileName === "index"
+          ? "Home"
+          : fileName.charAt(0).toUpperCase() + fileName.slice(1);
+      const icon = iconMap[fileName] || undefined;
+      return { name, code: filesMap[path], filePath: path, icon };
+    });
+  }, [filesMap]);
 
   const projectScreens = project?.screens;
   const initialScreens = useMemo(() => {
@@ -455,6 +821,22 @@ export default function ProjectPage() {
     });
   }, [project?.screens, hasLoadingScreens]);
 
+  // ---------- Refetch project when multi-file generation completes ----------
+  const prevMultiFileGeneratingRef = useRef(false);
+  useEffect(() => {
+    if (prevMultiFileGeneratingRef.current && !multiFileState.isGenerating) {
+      // Multi-file generation just finished — refetch to pick up new screens
+      console.log('[ProjectPage] Multi-file generation done, refetching project...');
+      setTimeout(() => {
+        refetch();
+        queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+        queryClient.invalidateQueries({ queryKey: ['project-files', projectId] });
+      }, 1000);
+
+    }
+    prevMultiFileGeneratingRef.current = multiFileState.isGenerating;
+  }, [multiFileState.isGenerating, multiFileState.files, refetch, queryClient, projectId, project?.name]);
+
   // ---------- Track completed screens ----------
   const completedScreensRef = useRef<Set<string>>(new Set());
   useEffect(() => {
@@ -474,109 +856,214 @@ export default function ProjectPage() {
     prevHasLoadingRef.current = hasLoadingScreens;
   }, [hasLoadingScreens, screens]);
 
-  // ---------- Skeleton creation + generation start ----------
-  const [skeletonsCreated, setSkeletonsCreated] = useState(false);
+  // ---------- Streaming design system generation (from dashboard/wizard) ----------
+  const designSystemTriggeredRef = useRef(false);
+
+  useEffect(() => {
+    const pending = locationState?.pendingDesignSystem;
+    if (!pending || !isProjectJoined || designSystemTriggeredRef.current) return;
+
+    designSystemTriggeredRef.current = true;
+    generateDesignSystem(pending);
+
+    // Clear pendingDesignSystem from location state to prevent re-trigger on re-render
+    navigate(location.pathname, {
+      replace: true,
+      state: { ...locationState, pendingDesignSystem: undefined, isNewProject: true },
+    });
+  }, [isProjectJoined, locationState, generateDesignSystem, navigate, location.pathname]);
+
+  // Restore unapproved plan: if project has a saved designSystem but no screens and
+  // generation hasn't been completed, the user left before approving — show the plan modal again.
+  useEffect(() => {
+    if (!project || designSystemTriggeredRef.current) return;
+    if (locationState?.pendingDesignSystem) return; // Will be handled by the effect above
+    if (designSystemState.status === 'generating') return; // Already streaming
+
+    const hasSavedDesignSystem = !!project.designSystem;
+    const hasNoScreens = !project.screens || project.screens.length === 0;
+    const notCompleted = !project.initialGenerationCompleted;
+
+    if (hasSavedDesignSystem && hasNoScreens && notCompleted) {
+      setShowPlanApproval(true);
+    }
+  }, [project, locationState?.pendingDesignSystem, designSystemState.status]);
+
+  // Show plan approval modal early when streaming sections start arriving
+  useEffect(() => {
+    if (designSystemState.status === 'generating' && designSystemState.sections && Object.keys(designSystemState.sections).length > 0) {
+      setShowPlanApproval(true);
+    }
+  }, [designSystemState.status, designSystemState.sections]);
+
+  // When design system completes via socket, refresh data (modal already open from streaming)
+  useEffect(() => {
+    if (designSystemState.status !== 'complete' || !designSystemState.designSystem) return;
+
+    queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+    queryClient.invalidateQueries({ queryKey: ['chatHistory', projectId] });
+
+    // Ensure modal is open (fallback for non-streaming path)
+    setShowPlanApproval(true);
+  }, [designSystemState.status, designSystemState.designSystem, queryClient, projectId]);
+
+  // ---------- Initial generation ----------
   const [generationStarted, setGenerationStarted] = useState(false);
   const [showPlanApproval, setShowPlanApproval] = useState(
     locationState?.showPlanApproval === true
   );
   const [approvedDesignSystem, setApprovedDesignSystem] = useState<DesignSystem | null>(null);
+  const [pendingInitialGeneration, setPendingInitialGeneration] =
+    useState<InitialGenerationPlan | null>(null);
+  const [initialGenerationError, setInitialGenerationError] = useState<string | null>(null);
+  const [isStartingInitialGeneration, setIsStartingInitialGeneration] = useState(false);
+
+  const queueInitialGeneration = useCallback((designSystem: DesignSystem | null | undefined) => {
+    if (!designSystem) return;
+    setInitialGenerationError(null);
+    setPendingInitialGeneration(buildInitialGenerationPlan(designSystem));
+  }, []);
 
   useEffect(() => {
-    if (designSystemProcessed || !projectId || skeletonsCreated) return;
-    if (showPlanApproval) {
-      if (!locationState?.designSystem && project?.designSystem) {
-        setShowPlanApproval(false);
+    if (!showPlanApproval && locationState?.showPlanApproval && locationState?.designSystem) {
+      navigate(location.pathname, { replace: true, state: { ...locationState, showPlanApproval: false } });
+    }
+  }, [showPlanApproval, location.pathname, locationState, navigate]);
+
+  useEffect(() => {
+    if (designSystemProcessed || pendingInitialGeneration || generationStarted || !projectId || initialGenerationError) return;
+    if (showPlanApproval) return; // Wait for user to approve the plan
+
+    const isNewProjectFromWizard = locationState?.isNewProject === true;
+    const initialGenerationDone = project?.initialGenerationCompleted === true;
+    const projectHasNoScreens = !project?.screens || project.screens.length === 0;
+
+    // Only auto-generate from explicitly approved design system or wizard locationState.
+    // NEVER auto-generate from project.designSystem — user must approve via PlanApprovalModal first.
+    const designSystem =
+      approvedDesignSystem ||
+      (isNewProjectFromWizard ? locationState?.designSystem : null);
+
+    if (!designSystem) {
+      if (initialGenerationDone && !isNewProjectFromWizard) {
+        setDesignSystemProcessed(true);
       }
+      // If project has unapproved designSystem + no screens → the restore effect shows PlanApprovalModal
       return;
     }
 
-    const isNewProjectFromWizard = locationState?.isNewProject === true;
-    const designSystemFromLocation = isNewProjectFromWizard
-      ? (approvedDesignSystem || locationState.designSystem)
-      : null;
-    const designSystemFromProject = project?.designSystem;
-    const projectHasNoScreens = !project?.screens || project.screens.length === 0;
-    const initialGenerationDone = project?.initialGenerationCompleted === true;
-
-    if (initialGenerationDone && !isNewProjectFromWizard) return;
-
-    const designSystem =
-      designSystemFromLocation ||
-      (projectHasNoScreens && !initialGenerationDone ? designSystemFromProject : null);
-
-    if (!designSystem) return;
-
-    setSkeletonsCreated(true);
-    const screenConfigs = designSystem.screens;
-    const skeletonScreens: ScreenData[] = screenConfigs.map(
-      (config, index) => ({
-        id: `skeleton-${index}-${config.id}`,
-        name: config.name,
-        type: "custom",
-        parentScreenId: null,
-        imageUrl: null,
-        thumbnailUrl: null,
-        htmlContent: null,
-        aiPrompt: config.purpose,
-        createdAt: null,
-        updatedAt: null,
-        x: 100 + index * SCREEN_SPACING_X,
-        y: 100,
-        width: DEVICE_WIDTH,
-        height: DEVICE_HEIGHT,
-        visible: true,
-        isLoading: true,
-        loadingText: `Generating ${config.name}...`,
-        screenNameForMatching: config.name,
-        generationIndex: index,
-        skeletonId: `skeleton-${index}-${config.id}`,
-      }),
-    );
-
-    setScreens(skeletonScreens);
-    if (skeletonScreens.length > 0) {
-      setSelectedIds([skeletonScreens[0].id]);
-    }
-  }, [projectId, locationState, project, designSystemProcessed, skeletonsCreated, showPlanApproval, approvedDesignSystem]);
+    queueInitialGeneration(designSystem);
+  }, [
+    queueInitialGeneration,
+    approvedDesignSystem,
+    designSystemProcessed,
+    generationStarted,
+    initialGenerationError,
+    locationState,
+    pendingInitialGeneration,
+    project,
+    projectId,
+    showPlanApproval,
+  ]);
 
   useEffect(() => {
-    if (!skeletonsCreated || generationStarted || designSystemProcessed) return;
+    if (!pendingInitialGeneration || generationStarted || designSystemProcessed || isStartingInitialGeneration || initialGenerationError) return;
     if (!socketConnected) return;
 
-    const isNewProjectFromWizard = locationState?.isNewProject === true;
-    const initialGenerationDone = project?.initialGenerationCompleted === true;
+    let cancelled = false;
 
-    if (initialGenerationDone && !isNewProjectFromWizard) {
-      setDesignSystemProcessed(true);
-      return;
-    }
+    const startInitialGeneration = async () => {
+      setIsStartingInitialGeneration(true);
+      setInitialGenerationError(null);
 
-    const designSystem = isNewProjectFromWizard
-      ? (approvedDesignSystem || locationState?.designSystem)
-      : (locationState?.designSystem || project?.designSystem);
+      try {
+        await startGeneration({
+          screens: pendingInitialGeneration.screens,
+          theme: pendingInitialGeneration.designSystem.theme as unknown as Record<string, string>,
+          themeMode: pendingInitialGeneration.designSystem.themeMode || "light",
+          navigation: pendingInitialGeneration.designSystem.navigation,
+          projectVisualDescription: pendingInitialGeneration.designSystem.projectVisualDescription,
+        });
 
-    if (!designSystem) return;
+        if (cancelled) return;
 
-    const screenConfigs = designSystem.screens;
-    setGenerationStarted(true);
-    setDesignSystemProcessed(true);
-    startGeneration({
-      screens: screenConfigs.map((config, index) => ({
-        name: config.name,
-        purpose: config.purpose,
-        layoutDescription: config.layoutDescription,
-        dataModel: config.dataModel,
-        interactions: config.interactions,
-        stateManagement: config.stateManagement,
-        skeletonId: `skeleton-${index}-${config.id}`,
-      })),
-      theme: designSystem.theme as unknown as Record<string, string>,
-      themeMode: designSystem.themeMode || 'light',
-      navigation: designSystem.navigation,
-      projectVisualDescription: designSystem.projectVisualDescription,
+        const skeletonScreens = createInitialSkeletonScreens(pendingInitialGeneration);
+        setScreens(skeletonScreens);
+        if (skeletonScreens.length > 0) {
+          setSelectedIds([skeletonScreens[0].id]);
+        }
+        setGenerationStarted(true);
+        setDesignSystemProcessed(true);
+        setPendingInitialGeneration(null);
+      } catch (error) {
+        if (cancelled) return;
+        setInitialGenerationError(
+          error instanceof Error ? error.message : "Failed to start initial generation.",
+        );
+        setPendingInitialGeneration(null);
+      } finally {
+        if (!cancelled) {
+          setIsStartingInitialGeneration(false);
+        }
+      }
+    };
+
+    void startInitialGeneration();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    designSystemProcessed,
+    generationStarted,
+    initialGenerationError,
+    isStartingInitialGeneration,
+    pendingInitialGeneration,
+    socketConnected,
+    startGeneration,
+  ]);
+
+  // Hydrate planned skeleton screens as soon as their streamed file completes.
+  // This avoids waiting for the full multi-file batch before preview/device testing becomes usable.
+  useEffect(() => {
+    if (multiFileState.files.size === 0) return;
+
+    setScreens((prev) => {
+      let changed = false;
+      const updated = [...prev];
+
+      for (const [filePath, fileState] of multiFileState.files.entries()) {
+        if (!fileState.isComplete || !fileState.content) continue;
+
+        const screenName = getScreenNameFromExpoFilePath(filePath);
+        if (!screenName) continue;
+
+        const normalizedScreenName = normalizeScreenNameForMatching(screenName);
+        const screenIndex = updated.findIndex(
+          (screen) =>
+            normalizeScreenNameForMatching(screen.screenNameForMatching || screen.name) === normalizedScreenName,
+        );
+
+        if (screenIndex === -1) continue;
+
+        const screen = updated[screenIndex];
+        if (screen.reactNativeCode === fileState.content && !screen.isLoading) continue;
+
+        updated[screenIndex] = {
+          ...screen,
+          htmlContent: fileState.content,
+          reactNativeCode: fileState.content,
+          contentType: "react-native",
+          buildStatus: screen.buildStatus ?? "unknown",
+          isLoading: false,
+          loadingText: undefined,
+        };
+        changed = true;
+      }
+
+      return changed ? updated : prev;
     });
-  }, [skeletonsCreated, generationStarted, designSystemProcessed, socketConnected, startGeneration, projectId, locationState, project, approvedDesignSystem]);
+  }, [multiFileState.files, screens]);
 
   // ---------- Recommendations ----------
   useEffect(() => {
@@ -630,11 +1117,33 @@ export default function ProjectPage() {
     return () => window.removeEventListener('message', handleMessage);
   }, [screens]);
 
+  // ---------- Auto-select first file when files load ----------
+  useEffect(() => {
+    if (projectFiles?.length && !selectedFile) {
+      setSelectedFile(projectFiles[0].path);
+    }
+  }, [projectFiles, selectedFile]);
+
+  // Clean up auto-save timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, []);
+
   // ---------- Auto-select first screen ----------
   useEffect(() => {
     if (screens.length > 0 && selectedIds.length === 0) {
+      const homeScreen = screens.find(
+        (s) =>
+          !s.isLoading &&
+          !s.hasError &&
+          !s.parentScreenId &&
+          normalizeScreenNameForMatching(s.name) === "home",
+      );
       const firstNonLoading = screens.find(s => !s.isLoading && !s.hasError && !s.parentScreenId);
-      if (firstNonLoading) setSelectedIds([firstNonLoading.id]);
+      if (homeScreen) setSelectedIds([homeScreen.id]);
+      else if (firstNonLoading) setSelectedIds([firstNonLoading.id]);
       else if (screens[0]) setSelectedIds([screens[0].id]);
     }
   }, [screens, selectedIds.length]);
@@ -739,8 +1248,9 @@ export default function ProjectPage() {
     });
   }, [locationState, project, retryScreen]);
 
-  const { openModal: openExpoModal } = useExpoPreviewStore();
-  const handleRunOnDevice = useCallback(() => openExpoModal(), [openExpoModal]);
+  const handleRunOnDevice = useCallback(() => {
+    // Deployment is handled via TestPanel + useDeployment
+  }, []);
   const handleExport = useCallback(() => setShowExportModal(true), []);
   const handleSettings = useCallback(() => setShowSettings(true), []);
 
@@ -791,31 +1301,23 @@ export default function ProjectPage() {
     [project?.id],
   );
 
-  const handleAddScreen = useCallback(() => {
-    setTriggerMessage(undefined);
-  }, []);
-
-  // ---------- Expo mobile preview helpers ----------
-  const getExpoCurrentCode = () => {
-    const screen = selectedScreen || screens.find((s) => s.reactNativeCode || s.reactCode || s.htmlContent);
-    return screen?.reactNativeCode || screen?.reactCode || screen?.htmlContent || null;
-  };
-
-  const getExpoCurrentScreenName = () => {
-    const screen = selectedScreen || screens.find((s) => s.reactNativeCode || s.reactCode || s.htmlContent);
-    return screen?.name || "Screen";
-  };
-
-  const getExpoCurrentScreenId = () => {
-    const screen = selectedScreen || screens.find((s) => s.reactNativeCode || s.reactCode || s.htmlContent);
-    return screen?.id;
-  };
+  const handleFeaturesChange = useCallback(async (features: string[]) => {
+    if (!projectId) return;
+    try {
+      await projectsApi.updateFeatures(projectId, features);
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+    } catch (error) {
+      console.error('Failed to update features:', error);
+    }
+  }, [projectId, queryClient]);
 
   // ---------- Preview props ----------
   const selectedBuildStatus = selectedScreen?.compiledHtml ? ('ready' as const) : ('idle' as const);
   const selectedStreamingState = selectedScreen
     ? socketScreenStates.get(selectedScreen.skeletonId || selectedScreen.id)
     : undefined;
+  const initialGenerationWaitingForSocket =
+    !!pendingInitialGeneration && !socketConnected && !generationStarted && !designSystemProcessed;
 
   // ---------- Loading / Error / Generating states ----------
   if (isLoading || (initialScreens.length > 0 && screens.length === 0)) {
@@ -882,7 +1384,7 @@ export default function ProjectPage() {
         projectId={projectId}
         projectName={project?.name || "Untitled Project"}
         onExport={handleExport}
-        onDesignSystem={() => setDesignSystemOpen(!designSystemOpen)}
+        onDesignSystem={() => setShowDesignSystemPanel(true)}
         onSettings={handleSettings}
         onPublish={() => setPublishModalOpen(true)}
         isPublished={project?.isPublic}
@@ -894,29 +1396,57 @@ export default function ProjectPage() {
         onDeploymentComplete={() => {
           queryClient.invalidateQueries({ queryKey: ['project', projectId] });
         }}
+        centerTab={centerTab}
+        onCenterTabChange={setCenterTab}
       />
 
-      {/* ============ 3-PANEL LAYOUT ============ */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* ============ LEFT PANEL: Screen list + Chat ============ */}
-        <div className="w-[380px] flex-shrink-0 flex flex-col border-r border-surface-800/50 bg-surface-950/80 backdrop-blur-xl">
-          {/* Screen list */}
-          <div className="h-[180px] flex-shrink-0 overflow-hidden border-b border-surface-800/50">
-            <ScreenListPanel
-              screens={screens}
-              selectedId={selectedIds[0] || null}
-              onSelectScreen={(id) => setSelectedIds([id])}
-              onAddScreen={handleAddScreen}
-            />
+      {(initialGenerationWaitingForSocket || initialGenerationError) && (
+        <div className="px-4 py-2 border-b border-surface-800 bg-surface-900/90">
+          <div
+            className={cn(
+              "flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm",
+              initialGenerationError
+                ? "border border-red-500/20 bg-red-500/10 text-red-300"
+                : "border border-amber-500/20 bg-amber-500/10 text-amber-200",
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>
+                {initialGenerationError ||
+                  "Waiting for the realtime connection before initial generation can start."}
+              </span>
+            </div>
+            {initialGenerationError && (
+              <button
+                onClick={() =>
+                  queueInitialGeneration(
+                    approvedDesignSystem ||
+                      locationState?.designSystem ||
+                      project?.designSystem ||
+                      null,
+                  )
+                }
+                className="px-2.5 py-1 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors"
+              >
+                Retry
+              </button>
+            )}
           </div>
+        </div>
+      )}
 
+      {/* ============ DESKTOP 3-PANEL LAYOUT ============ */}
+      <div className="hidden md:flex flex-1 overflow-hidden relative">
+        {/* ============ LEFT PANEL: Chat ============ */}
+        <div style={{ width: chatWidth }} className="flex-shrink-0 flex flex-col border-r border-surface-800/50 bg-surface-950/80 backdrop-blur-xl">
           {/* AI Chat */}
           <div className="flex-1 overflow-hidden">
             {projectId && (
               <ChatSidebar
                 projectId={projectId}
                 projectName={project?.name || "Untitled Project"}
-                screenId={undefined}
+                screenId={selectedScreen?.id}
                 screenName={selectedScreen?.name}
                 parentScreenId={variationParentId}
                 isCollapsed={false}
@@ -1036,47 +1566,201 @@ export default function ProjectPage() {
                 startMultiFileGeneration={startMultiFileGeneration}
                 modifyMultiFile={modifyMultiFile}
                 multiFileState={multiFileState}
+                actionLogs={actionLogs}
+                isActionLogActive={isActionLogActive}
+                enabledFeatures={project?.enabledFeatures || []}
+                onFeaturesChange={handleFeaturesChange}
+                referenceImageUrl={project?.referenceImageUrl}
               />
             )}
           </div>
         </div>
 
-        {/* ============ CENTER PANEL: Phone Preview ============ */}
+        <ResizeHandle onMouseDown={chatResize.onMouseDown} direction="right" />
+        {/* ============ CENTER PANEL: Preview / Code ============ */}
         <div className="flex-1 flex flex-col overflow-hidden relative">
-          {isRNProject ? (
-            <WebPreview
-              code={selectedScreen?.reactNativeCode || selectedScreen?.reactCode || selectedScreen?.htmlContent || null}
-              onOpenExpo={handleRunOnDevice}
-              isGenerating={selectedScreen?.isLoading}
-              stageMessage={selectedStreamingState?.stageMessage || selectedStreamingState?.statusMessage}
-            />
-          ) : (
-            <PhonePreviewPanel
-              screen={selectedScreen || null}
-              buildStatus={selectedBuildStatus}
-              streamingHtml={selectedStreamingState?.html}
-              stageMessage={selectedStreamingState?.stageMessage || selectedStreamingState?.statusMessage}
-              progressPercent={selectedStreamingState?.progress}
-              isRNProject={isRNProject}
-              onRegenerate={handleRetryScreen}
-              onRunOnDevice={handleRunOnDevice}
-            />
+          {/* Preview tab */}
+          {centerTab === 'preview' && (
+            <>
+              {isRNProject ? (
+                <WebPreview
+                  code={selectedScreen?.reactNativeCode || selectedScreen?.reactCode || selectedScreen?.htmlContent || tabScreensFromFiles?.[0]?.code || null}
+                  screens={tabScreensFromFiles || (screens.length > 1 ? screens.filter(s => s.reactNativeCode || s.reactCode).map(s => ({
+                    name: s.name,
+                    code: (s.reactNativeCode || s.reactCode || '') as string,
+                  })) : undefined)}
+                  files={filesMap}
+                  expoSessionId={null}
+                  expoSessionRevision={null}
+                  onOpenExpo={handleRunOnDevice}
+                  onFixErrors={(msg) => setTriggerMessage(msg)}
+                  isGenerating={selectedScreen?.isLoading}
+                  stageMessage={selectedStreamingState?.stageMessage || selectedStreamingState?.statusMessage}
+                  screenId={selectedScreen?.id}
+                  projectId={projectId}
+                />
+              ) : (
+                <PhonePreviewPanel
+                  screen={selectedScreen || null}
+                  buildStatus={selectedBuildStatus}
+                  streamingHtml={selectedStreamingState?.html}
+                  stageMessage={selectedStreamingState?.stageMessage || selectedStreamingState?.statusMessage}
+                  progressPercent={selectedStreamingState?.progress}
+                  isRNProject={isRNProject}
+                  expoSessionId={null}
+                  onRegenerate={handleRetryScreen}
+                  onRunOnDevice={handleRunOnDevice}
+                  onFixErrors={(msg) => setTriggerMessage(msg)}
+                />
+              )}
+
+              {/* Empty state */}
+              {screens.length === 0 && project?.status !== "generating" && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="text-center space-y-4">
+                    <div className="w-16 h-16 rounded-2xl bg-surface-800/50 border border-surface-700/50 flex items-center justify-center mx-auto">
+                      <MessageSquare className="w-7 h-7 text-surface-500" />
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-semibold text-surface-300">No screens yet</h3>
+                      <p className="text-sm text-surface-500 max-w-xs">
+                        Use the chat to describe screens you want to create.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
-          {/* Empty state */}
-          {screens.length === 0 && project?.status !== "generating" && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="text-center space-y-4">
-                <div className="w-16 h-16 rounded-2xl bg-surface-800/50 border border-surface-700/50 flex items-center justify-center mx-auto">
-                  <MessageSquare className="w-7 h-7 text-surface-500" />
+          {/* Code tab — Rork-style: file tree + editor + floating preview */}
+          {centerTab === 'code' && (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {/* Top: file path breadcrumb + preview toggle */}
+              <div className="flex items-center justify-between px-3 py-1.5 border-b border-surface-800/50 bg-surface-900/80">
+                <span className="text-[11px] text-surface-500 truncate flex items-center gap-1.5">
+                  {selectedFile || 'No file selected'}
+                  {selectedFile && dirtyFiles[selectedFile] && !savingFile && (
+                    <span className="w-2 h-2 rounded-full bg-amber-400" title="Unsaved changes" />
+                  )}
+                  {savingFile === selectedFile && (
+                    <span className="text-[10px] text-primary-400">Saving...</span>
+                  )}
+                  {!canEditCode && selectedFile && (
+                    <span className="text-[10px] text-surface-600 ml-1">Read-only — upgrade to edit</span>
+                  )}
+                </span>
+                <button
+                  onClick={() => setShowCodePreview(v => !v)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium transition-colors",
+                    showCodePreview
+                      ? "bg-primary-500/20 text-primary-400 border border-primary-500/30"
+                      : "text-surface-500 hover:text-surface-300 hover:bg-surface-800/50",
+                  )}
+                  title={showCodePreview ? "Hide preview" : "Show preview"}
+                >
+                  <Smartphone className="w-3 h-3" />
+                  Preview
+                </button>
+              </div>
+              {/* Middle: file tree + editor + optional preview */}
+              <div className="flex-1 flex overflow-hidden">
+                {/* File tree sidebar */}
+                <div className="w-56 flex-shrink-0 border-r border-surface-800/50 bg-surface-950 overflow-y-auto">
+                  <div className="px-3 py-2">
+                    <h3 className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider mb-2">Files</h3>
+                  </div>
+                  {(!projectFiles || projectFiles.length === 0) ? (
+                    <p className="text-xs text-surface-600 px-3">No files yet</p>
+                  ) : (
+                    <FileTreeView
+                      files={projectFiles as Array<{ path: string; content: string }>}
+                      selectedFile={selectedFile}
+                      onSelectFile={setSelectedFile}
+                    />
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <h3 className="text-lg font-semibold text-surface-300">No screens yet</h3>
-                  <p className="text-sm text-surface-500 max-w-xs">
-                    Use the chat to describe screens you want to create.
-                  </p>
+                {/* Editor */}
+                <div className="flex-1 overflow-hidden">
+                  <Suspense fallback={
+                    <div className="flex-1 flex items-center justify-center bg-surface-950">
+                      <Loader2 className="w-6 h-6 animate-spin text-surface-500" />
+                    </div>
+                  }>
+                    <MonacoEditor
+                      height="100%"
+                      language={selectedFile?.endsWith('.css') ? 'css' : selectedFile?.endsWith('.json') ? 'json' : 'typescript'}
+                      path={selectedFile || undefined}
+                      theme="vs-dark"
+                      value={
+                        selectedFile
+                          ? (dirtyFiles[selectedFile] ?? filesMap?.[selectedFile.startsWith('/') ? selectedFile.slice(1) : selectedFile] ?? '// Select a file to view its code')
+                          : '// Select a file to view its code'
+                      }
+                      onChange={handleEditorChange}
+                      beforeMount={(monacoInstance) => {
+                        // These are RN .tsx files — enable JSX and disable semantic checks
+                        monacoInstance.languages.typescript.typescriptDefaults.setCompilerOptions({
+                          jsx: monacoInstance.languages.typescript.JsxEmit.ReactJSX,
+                          esModuleInterop: true,
+                          allowSyntheticDefaultImports: true,
+                          moduleResolution: monacoInstance.languages.typescript.ModuleResolutionKind.NodeJs,
+                          target: monacoInstance.languages.typescript.ScriptTarget.ESNext,
+                          module: monacoInstance.languages.typescript.ModuleKind.ESNext,
+                          allowJs: true,
+                        });
+                        monacoInstance.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+                          noSemanticValidation: true,
+                          noSyntaxValidation: false,
+                        });
+                      }}
+                      onMount={(editor, monacoInstance) => {
+                        editor.addCommand(
+                          // Cmd+S (Mac) / Ctrl+S (Win)
+                          // eslint-disable-next-line no-bitwise
+                          monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS,
+                          () => handleEditorSave(),
+                        );
+                      }}
+                      options={{
+                        readOnly: !canEditCode,
+                        minimap: { enabled: false },
+                        fontSize: 13,
+                        wordWrap: 'on',
+                        scrollBeyondLastLine: false,
+                        padding: { top: 12 },
+                      }}
+                    />
+                  </Suspense>
                 </div>
               </div>
+              {/* PiP phone preview — draggable floating overlay, same preview engine as main */}
+              <AnimatePresence>
+                {showCodePreview && (
+                  <PiPPreview
+                    onClose={() => setShowCodePreview(false)}
+                    onRefresh={() => setPipRefreshKey(k => k + 1)}
+                  >
+                    <WebPreview
+                      key={pipRefreshKey}
+                      compact
+                      code={selectedScreen?.reactNativeCode || selectedScreen?.reactCode || selectedScreen?.htmlContent || tabScreensFromFiles?.[0]?.code || null}
+                      screens={tabScreensFromFiles || (screens.length > 1 ? screens.filter(s => s.reactNativeCode || s.reactCode).map(s => ({
+                        name: s.name,
+                        code: (s.reactNativeCode || s.reactCode || '') as string,
+                      })) : undefined)}
+                      files={filesMap}
+                      expoSessionId={null}
+                      expoSessionRevision={null}
+                      isGenerating={selectedScreen?.isLoading}
+                      stageMessage={selectedStreamingState?.stageMessage || selectedStreamingState?.statusMessage}
+                      screenId={selectedScreen?.id}
+                      projectId={projectId}
+                    />
+                  </PiPPreview>
+                )}
+              </AnimatePresence>
             </div>
           )}
 
@@ -1099,17 +1783,29 @@ export default function ProjectPage() {
           </AnimatePresence>
         </div>
 
-        {/* ============ RIGHT PANEL: Test on Phone ============ */}
-        <div className="w-[280px] flex-shrink-0 border-l border-surface-800/50">
-          {projectId && (
-            <TestPanel
-              projectId={projectId}
-              getCurrentCode={getExpoCurrentCode}
-              getCurrentScreenName={getExpoCurrentScreenName}
-              getCurrentScreenId={getExpoCurrentScreenId}
-            />
+        {/* Right panel only visible on preview tab */}
+        {centerTab === 'preview' && (
+          <>
+            <ResizeHandle onMouseDown={rightResize.onMouseDown} direction="left" />
+            {/* ============ RIGHT PANEL: Test on Phone ============ */}
+            <div style={{ width: rightWidth }} className="flex-shrink-0 border-l border-surface-800/50 flex flex-col">
+              {projectId && (
+                <>
+                  <div className="flex-1 min-h-0">
+                    <TestPanel
+                      projectId={projectId}
+                    />
+                  </div>
+                  <PreviewConsole
+                    sessionId={null}
+                    onFixErrors={(msg) => setTriggerMessage(msg)}
+                    defaultExpanded
+                  />
+                </>
           )}
         </div>
+        </>
+        )}
 
         {/* Design System Sidebar (overlay) */}
         <AnimatePresence>
@@ -1160,6 +1856,236 @@ export default function ProjectPage() {
         </AnimatePresence>
       </div>
 
+      {/* ============ MOBILE SINGLE-PANEL LAYOUT ============ */}
+      <div className="flex md:hidden flex-col flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden">
+          {mobileTab === 'chat' && (
+            <div className="h-full flex flex-col">
+              {/* AI Chat */}
+              <div className="flex-1 overflow-hidden">
+                {projectId && (
+                  <ChatSidebar
+                    projectId={projectId}
+                    projectName={project?.name || "Untitled Project"}
+                    screenId={selectedScreen?.id}
+                    screenName={selectedScreen?.name}
+                    parentScreenId={variationParentId}
+                    isCollapsed={false}
+                    onToggleCollapse={() => {}}
+                    embedded
+                    triggerMessage={triggerMessage}
+                    triggerScreenId={triggerScreenId}
+                    onTriggerMessageConsumed={() => {
+                      setTriggerMessage(undefined);
+                      setTriggerScreenId(undefined);
+                    }}
+                    onGenerationStart={() => setIsGeneratingVariation(true)}
+                    onGenerationEnd={() => {
+                      setIsGeneratingVariation(false);
+                      setVariationParentId(undefined);
+                    }}
+                    onSetScreenLoading={(screenId, loading, loadingText) => {
+                      setScreens((prev) =>
+                        prev.map((s) =>
+                          s.id === screenId
+                            ? { ...s, isLoading: loading, loadingText: loading ? loadingText : undefined }
+                            : s,
+                        ),
+                      );
+                    }}
+                    onScreenCreated={(screen) => {
+                      if (screen) {
+                        setScreens((prev) => {
+                          const existingIndex = prev.findIndex((s) => s.id === screen.id);
+                          if (existingIndex !== -1) {
+                            const existingScreen = prev[existingIndex];
+                            const updated = [...prev];
+                            updated[existingIndex] = {
+                              ...existingScreen,
+                              htmlContent: screen.htmlContent,
+                              name: screen.name || existingScreen.name,
+                              designData: screen.designData || existingScreen.designData,
+                              isLoading: false,
+                              loadingText: undefined,
+                            };
+                            return updated;
+                          }
+                          const skeletonIndex = prev.findIndex(
+                            (s) =>
+                              s.isLoading && s.screenNameForMatching?.replace(/_/g, " ").toLowerCase() === screen.name.toLowerCase(),
+                          );
+                          if (skeletonIndex !== -1) {
+                            const skeleton = prev[skeletonIndex];
+                            const newScreen = transformStreamScreenToCanvas(screen, prev);
+                            newScreen.x = skeleton.x;
+                            newScreen.y = skeleton.y;
+                            const updated = [...prev];
+                            updated[skeletonIndex] = newScreen;
+                            return updated;
+                          }
+                          const newScreen = transformStreamScreenToCanvas(screen, prev);
+                          return [...prev, newScreen];
+                        });
+                        if (screen.id) setSelectedIds([screen.id]);
+                      }
+                      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+                      queryClient.invalidateQueries({ queryKey: ["chatHistory", projectId] });
+                      refetch();
+                      useAuthStore.getState().refreshCredits();
+                    }}
+                    onAddSkeletons={(screenNames) => {
+                      setScreens((prev) => {
+                        const mainScreensCount = prev.filter(
+                          (s) => !s.parentScreenId && !s.isLoading,
+                        ).length;
+                        const skeletons: ScreenData[] = screenNames.map((name, i) => ({
+                          id: `skeleton-${name}-${Date.now()}-${i}`,
+                          name: name,
+                          type: "custom",
+                          parentScreenId: null,
+                          imageUrl: null,
+                          thumbnailUrl: null,
+                          htmlContent: null,
+                          aiPrompt: null,
+                          createdAt: null,
+                          updatedAt: null,
+                          x: 100 + (mainScreensCount + i) * SCREEN_SPACING_X,
+                          y: 100,
+                          width: DEVICE_WIDTH,
+                          height: DEVICE_HEIGHT,
+                          visible: true,
+                          isLoading: true,
+                          loadingText: `Generating ${name}...`,
+                          screenNameForMatching: name,
+                        }));
+                        return [...prev, ...skeletons];
+                      });
+                    }}
+                    onRemoveSkeletons={(screenNames) => {
+                      setScreens((prev) =>
+                        prev.filter(
+                          (s) =>
+                            !s.isLoading ||
+                            !screenNames.includes(s.screenNameForMatching || ""),
+                        ),
+                      );
+                    }}
+                    onViewScreen={handleViewScreen}
+                    progressMessages={progressMessages}
+                    activeProgress={activeProgress}
+                    onGenerateRecommended={handleGenerateRecommended}
+                    onDismissRecommendations={handleDismissRecommendations}
+                    screens={screens}
+                    onUpdateScreenBrief={handleUpdateScreenBrief}
+                    initialRecommendations={initialRecommendations}
+                    onClearInitialRecommendations={() => setInitialRecommendations(null)}
+                    socketConnected={socketConnected}
+                    socketSendMessage={socketSendMessage}
+                    socketChatState={socketChatState}
+                    onSocketChatComplete={onChatComplete}
+                    onSocketChatError={onChatError}
+                    startMultiFileGeneration={startMultiFileGeneration}
+                    modifyMultiFile={modifyMultiFile}
+                    multiFileState={multiFileState}
+                    actionLogs={actionLogs}
+                    isActionLogActive={isActionLogActive}
+                    enabledFeatures={project?.enabledFeatures || []}
+                    onFeaturesChange={handleFeaturesChange}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+          {mobileTab === 'preview' && (
+            <div className="h-full flex items-center justify-center bg-surface-950">
+              {isRNProject ? (
+                <WebPreview
+                  code={selectedScreen?.reactNativeCode || selectedScreen?.reactCode || selectedScreen?.htmlContent || tabScreensFromFiles?.[0]?.code || null}
+                  screens={tabScreensFromFiles || (screens.length > 1 ? screens.filter(s => s.reactNativeCode || s.reactCode).map(s => ({
+                    name: s.name,
+                    code: (s.reactNativeCode || s.reactCode || '') as string,
+                  })) : undefined)}
+                  files={filesMap}
+                  expoSessionId={null}
+                  expoSessionRevision={null}
+                  onOpenExpo={handleRunOnDevice}
+                  onFixErrors={(msg) => setTriggerMessage(msg)}
+                  isGenerating={selectedScreen?.isLoading}
+                  stageMessage={selectedStreamingState?.stageMessage || selectedStreamingState?.statusMessage}
+                  screenId={selectedScreen?.id}
+                  projectId={projectId}
+                />
+              ) : (
+                <PhonePreviewPanel
+                  screen={selectedScreen || null}
+                  buildStatus={selectedBuildStatus}
+                  streamingHtml={selectedStreamingState?.html}
+                  stageMessage={selectedStreamingState?.stageMessage || selectedStreamingState?.statusMessage}
+                  progressPercent={selectedStreamingState?.progress}
+                  isRNProject={isRNProject}
+                  expoSessionId={null}
+                  onRegenerate={handleRetryScreen}
+                  onRunOnDevice={handleRunOnDevice}
+                  onFixErrors={(msg) => setTriggerMessage(msg)}
+                />
+              )}
+            </div>
+          )}
+          {mobileTab === 'test' && (
+            <div className="h-full flex flex-col">
+              {projectId && (
+                <>
+                  <div className="flex-1 min-h-0">
+                    <TestPanel
+                      projectId={projectId}
+                    />
+                  </div>
+                  <PreviewConsole
+                    sessionId={null}
+                    onFixErrors={(msg) => setTriggerMessage(msg)}
+                    defaultExpanded
+                  />
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Mobile tab bar */}
+        <div className="flex border-t border-surface-700 bg-surface-900 flex-shrink-0">
+          <button
+            onClick={() => setMobileTab('chat')}
+            className={cn(
+              "flex-1 py-3 text-xs font-medium flex flex-col items-center gap-1",
+              mobileTab === 'chat' ? 'text-blue-400' : 'text-surface-500'
+            )}
+          >
+            <MessageSquare className="w-5 h-5" />
+            Chat
+          </button>
+          <button
+            onClick={() => setMobileTab('preview')}
+            className={cn(
+              "flex-1 py-3 text-xs font-medium flex flex-col items-center gap-1",
+              mobileTab === 'preview' ? 'text-blue-400' : 'text-surface-500'
+            )}
+          >
+            <Smartphone className="w-5 h-5" />
+            Preview
+          </button>
+          <button
+            onClick={() => setMobileTab('test')}
+            className={cn(
+              "flex-1 py-3 text-xs font-medium flex flex-col items-center gap-1",
+              mobileTab === 'test' ? 'text-blue-400' : 'text-surface-500'
+            )}
+          >
+            <QrCode className="w-5 h-5" />
+            Test
+          </button>
+        </div>
+      </div>
+
       {/* ============ MODALS ============ */}
       {projectId && (
         <ExportModal
@@ -1167,6 +2093,18 @@ export default function ProjectPage() {
           onClose={() => setShowExportModal(false)}
           projectId={projectId}
           projectName={project?.name || "Untitled Project"}
+        />
+      )}
+
+      {projectId && (
+        <DesignSystemPanel
+          isOpen={showDesignSystemPanel}
+          onClose={() => setShowDesignSystemPanel(false)}
+          projectId={projectId}
+          designSystem={project?.designSystem}
+          onFilesUpdated={() => {
+            queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+          }}
         />
       )}
 
@@ -1185,6 +2123,8 @@ export default function ProjectPage() {
         }))}
         onPublishSuccess={() => refetch()}
         onRefreshScreens={async () => { await refetch(); }}
+        slug={project?.slug}
+        onOpenSettings={handleSettings}
       />
 
       <AnimatePresence>
@@ -1206,9 +2146,18 @@ export default function ProjectPage() {
           isOpen={showSettings}
           onClose={() => setShowSettings(false)}
           projectId={projectId}
-          projectName={project?.name || "Untitled Project"}
-          screensCount={screens.filter(s => !s.isLoading).length}
-          createdAt={project?.createdAt || new Date().toISOString()}
+          project={project || {
+            id: projectId,
+            name: 'Untitled Project',
+            description: '',
+            prompt: '',
+            styleId: null,
+            userId: '',
+            status: 'draft' as const,
+            screensCount: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }}
           onProjectUpdate={() => {
             queryClient.invalidateQueries({ queryKey: ['project', projectId] });
           }}
@@ -1232,25 +2181,143 @@ export default function ProjectPage() {
         variant="danger"
       />
 
-      {showPlanApproval && locationState?.designSystem && projectId && (
+      {showPlanApproval && (locationState?.designSystem || designSystemState.designSystem || project?.designSystem || (designSystemState.status === 'generating' && designSystemState.sections)) && projectId && !project?.initialGenerationCompleted && (
         <PlanApprovalModal
-          designSystem={locationState.designSystem}
+          designSystem={locationState?.designSystem || designSystemState.designSystem || project?.designSystem || { projectName: '', themeMode: 'light', theme: {} as any, navigation: { type: 'bottom_tabs', tabs: [] }, designReasoning: '', projectVisualDescription: '', screens: [] }}
           projectId={projectId}
-          onApprove={(editedDS) => {
-            setApprovedDesignSystem(editedDS);
-            setShowPlanApproval(false);
+          streamingSections={designSystemState.sections}
+          isStreaming={designSystemState.status === 'generating'}
+          onApprove={async (editedDS) => {
+            try {
+              await projectsApi.update(projectId, {
+                designSystem: editedDS,
+                ...(editedDS.appMetadata && {
+                  appName: editedDS.appMetadata.appName,
+                  appShortName: editedDS.appMetadata.displayName,
+                  slug: editedDS.appMetadata.slug,
+                  bundleIdIos: editedDS.appMetadata.bundleId,
+                  bundleIdAndroid: editedDS.appMetadata.bundleId,
+                }),
+              });
+              setApprovedDesignSystem(editedDS);
+              queueInitialGeneration(editedDS);
+              setShowPlanApproval(false);
+            } catch (error) {
+              setInitialGenerationError(
+                error instanceof Error
+                  ? error.message
+                  : "Failed to save the approved plan before generation.",
+              );
+            }
           }}
           onCancel={() => navigate('/dashboard')}
         />
       )}
 
-      {projectId && (
-        <ExpoPreviewModal
-          projectId={projectId}
-          getCurrentCode={getExpoCurrentCode}
-          getCurrentScreenName={getExpoCurrentScreenName}
-          getCurrentScreenId={getExpoCurrentScreenId}
-        />
+    </div>
+  );
+}
+
+/** Rork-style file tree with folder grouping */
+function FileTreeView({
+  files,
+  selectedFile,
+  onSelectFile,
+}: {
+  files: Array<{ path: string; content: string }>;
+  selectedFile: string | null;
+  onSelectFile: (path: string) => void;
+}) {
+  // Build tree structure from flat file list
+  const tree = useMemo(() => {
+    const root: Record<string, any> = {};
+    for (const f of files) {
+      const parts = f.path.replace(/^\//, '').split('/');
+      let current = root;
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (!current[parts[i]]) current[parts[i]] = {};
+        current = current[parts[i]];
+      }
+      current[parts[parts.length - 1]] = f.path;
+    }
+    return root;
+  }, [files]);
+
+  return <TreeNode node={tree} selectedFile={selectedFile} onSelectFile={onSelectFile} depth={0} />;
+}
+
+function TreeNode({
+  node,
+  selectedFile,
+  onSelectFile,
+  depth,
+  name,
+}: {
+  node: Record<string, any> | string;
+  selectedFile: string | null;
+  onSelectFile: (path: string) => void;
+  depth: number;
+  name?: string;
+}) {
+  const [expanded, setExpanded] = useState(depth < 2);
+
+  // Leaf node (file)
+  if (typeof node === 'string') {
+    const fileName = name || node.split('/').pop() || node;
+    const isActive = selectedFile === node;
+    return (
+      <button
+        onClick={() => onSelectFile(node)}
+        className={cn(
+          "w-full flex items-center gap-1.5 py-1 px-2 text-left text-xs rounded transition-colors",
+          isActive
+            ? "bg-primary-500/15 text-primary-300"
+            : "text-surface-400 hover:text-surface-200 hover:bg-surface-800/50",
+        )}
+        style={{ paddingLeft: depth * 12 + 8 }}
+      >
+        <FileCode className="w-3.5 h-3.5 flex-shrink-0 opacity-60" />
+        <span className="truncate">{fileName}</span>
+      </button>
+    );
+  }
+
+  // Directory node
+  const entries = Object.entries(node).sort(([a, va], [b, vb]) => {
+    // Folders first, then files
+    const aIsDir = typeof va !== 'string';
+    const bIsDir = typeof vb !== 'string';
+    if (aIsDir !== bIsDir) return aIsDir ? -1 : 1;
+    return a.localeCompare(b);
+  });
+
+  if (!name) {
+    // Root level — render children directly
+    return (
+      <div className="space-y-px">
+        {entries.map(([key, value]) => (
+          <TreeNode key={key} node={value} name={key} selectedFile={selectedFile} onSelectFile={onSelectFile} depth={depth} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-1.5 py-1 px-2 text-left text-xs text-surface-300 hover:text-white hover:bg-surface-800/30 rounded transition-colors"
+        style={{ paddingLeft: depth * 12 + 8 }}
+      >
+        <FolderTree className={cn("w-3.5 h-3.5 flex-shrink-0 transition-transform", expanded ? "text-primary-400" : "text-surface-500")} />
+        <span className="truncate font-medium">{name}</span>
+      </button>
+      {expanded && (
+        <div>
+          {entries.map(([key, value]) => (
+            <TreeNode key={key} node={value} name={key} selectedFile={selectedFile} onSelectFile={onSelectFile} depth={depth + 1} />
+          ))}
+        </div>
       )}
     </div>
   );

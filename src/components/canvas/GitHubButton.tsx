@@ -42,6 +42,7 @@ export function GitHubButton({ projectId, className }: GitHubButtonProps) {
     status,
     isLoading,
     error,
+    isAvailable,
     getAuthUrl,
     push,
     pull,
@@ -107,6 +108,8 @@ export function GitHubButton({ projectId, className }: GitHubButtonProps) {
 
   const isConnected = status?.connected === true;
   const syncInfo = getSyncStatusLabel(status?.syncStatus ?? "not_connected");
+
+  if (!isAvailable && !isConnected) return null;
 
   return (
     <div className={cn("relative", className)} ref={dropdownRef}>

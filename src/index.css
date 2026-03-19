@@ -109,3 +109,9 @@ input[type="range"]::-moz-range-thumb {
   border: none;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
+
+/* Streaming cursor blink for chat */
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}

@@ -19,6 +19,7 @@ interface PreviewToolbarProps {
   onRefresh?: () => void;
   onOpenExpo?: () => void;
   isLoading?: boolean;
+  children?: React.ReactNode;
 }
 
 const DEVICE_OPTIONS: { value: DeviceType; label: string; icon: typeof Smartphone }[] = [
@@ -32,6 +33,7 @@ export function PreviewToolbar({
   onRefresh,
   onOpenExpo,
   isLoading,
+  children,
 }: PreviewToolbarProps) {
   const {
     previewMode,
@@ -56,9 +58,9 @@ export function PreviewToolbar({
             label="Web"
           />
           <ModeButton
-            active={previewMode === "device"}
+            active={false}
             onClick={() => {
-              setPreviewMode("device");
+              setPreviewMode("web");
               onOpenExpo?.();
             }}
             icon={Smartphone}
@@ -80,6 +82,8 @@ export function PreviewToolbar({
             ))}
           </select>
         )}
+
+        {children}
       </div>
 
       {/* Right: Controls */}

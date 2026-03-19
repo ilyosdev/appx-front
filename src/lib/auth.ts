@@ -18,11 +18,14 @@ export interface AuthTokens {
 
 export type PlanType = "free" | "starter" | "pro" | "business";
 
+export type UserRole = 'user' | 'developer' | 'admin' | 'superadmin';
+
 export interface AuthUser {
   id: string;
   email: string;
   name: string | null;
   avatarUrl?: string | null;
+  role?: UserRole;
   plan?: PlanType;
   creditsRemaining?: string;
   subscriptionStatus?: "active" | "canceled" | "past_due" | "trialing";

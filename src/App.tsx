@@ -16,11 +16,11 @@ const Settings = lazy(() => import('./pages/Settings'));
 const Terms = lazy(() => import('./pages/Terms'));
 const Privacy = lazy(() => import('./pages/Privacy'));
 const Pricing = lazy(() => import('./pages/Pricing'));
-const Admin = lazy(() => import('./pages/Admin'));
 const AuthCallback = lazy(() => import('./pages/AuthCallback'));
 const Gallery = lazy(() => import('./pages/Gallery'));
 const CodeStudio = lazy(() => import('./pages/CodeStudio'));
 const PublicProject = lazy(() => import('./pages/PublicProject'));
+const PublishedAppPage = lazy(() => import('./pages/PublishedAppPage'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 const queryClient = new QueryClient({
@@ -69,6 +69,7 @@ function App() {
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/gallery" element={<Gallery />} />
                   <Route path="/p/:projectId" element={<PublicProject />} />
+                  <Route path="/app/:slug" element={<PublishedAppPage />} />
                   <Route path="/auth/callback" element={<AuthCallback />} />
 
                   {/* Protected routes */}
@@ -78,7 +79,6 @@ function App() {
                     <Route path="/project/:projectId/canvas" element={<Canvas />} />
                     <Route path="/project/:projectId/code" element={<CodeStudio />} />
                     <Route path="/settings" element={<Settings />} />
-                    <Route path="/admin" element={<Admin />} />
                   </Route>
 
                   {/* 404 */}

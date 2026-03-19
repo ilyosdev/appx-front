@@ -7,8 +7,8 @@ import { projectsApi } from '../lib/projects';
 import { paymentsApi } from '../lib/payments';
 import { useAuthStore } from '../stores/authStore';
 import { useBillingStore } from '../stores/billingStore';
+import { useModelStore } from '../stores/modelStore';
 import { styleExtractionApi, type VisualInspiration } from '../lib/style-extraction';
-import { designSystemApi, type DesignSystem } from '../lib/design-system';
 
 const EXAMPLE_PROMPTS = [
   'Fintech app for managing crypto portfolio with real-time price alerts and portfolio analytics',
@@ -41,6 +41,10 @@ export default function ProjectWizard() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null);
   const [replicateMode, setReplicateMode] = useState<'replicate' | 'inspire'>('replicate');
+
+  // API/Swagger integration state
+  const [showApiConnect, setShowApiConnect] = useState(false);
+  const [swaggerUrl, setSwaggerUrl] = useState('');
 
   const isValid = appDescription.length >= MIN_DESCRIPTION_LENGTH;
 
@@ -125,9 +129,9 @@ export default function ProjectWizard() {
     setError(null);
 
     try {
-      // Check credits BEFORE creating project (design system requires 8 credits)
-      const DESIGN_SYSTEM_COST = 8;
-      if (credits !== null && credits < DESIGN_SYSTEM_COST) {
+      // Check credits BEFORE creating project (costs 1 credit per operation)
+      const PROJECT_CREATE_COST = 1;
+      if (credits !== null && credits < PROJECT_CREATE_COST) {
         openUpgradeModal();
         setError('You need more credits to generate this project.');
         setIsSubmitting(false);
@@ -164,23 +168,26 @@ export default function ProjectWizard() {
             aesthetic: inspiration.combinedInspiration || inspiration.aiObservations,
           },
         }),
+        // Pass Swagger/API documentation URL
+        ...(swaggerUrl.trim() && { apiDocumentation: swaggerUrl.trim() }),
       });
 
       const projectId = response.data.data.id;
       sessionStorage.removeItem('pendingAppDescription');
       sessionStorage.removeItem('pendingInspiration');
 
-      setSubmitStage('Generating design system...');
-      const designSystemResponse = await designSystemApi.generate(
-        projectId,
-        appDescription,
-        'mobile'
-      );
-      const designSystem: DesignSystem = (designSystemResponse.data as any).data?.designSystem ?? designSystemResponse.data.designSystem;
+      const modelId = useModelStore.getState().getEffectiveModelId() || undefined;
 
-      setSubmitStage('Preparing canvas...');
       navigate(`/project/${projectId}/canvas`, {
-        state: { designSystem, isNewProject: true, showPlanApproval: true },
+        state: {
+          isNewProject: true,
+          pendingDesignSystem: {
+            userInput: appDescription,
+            referenceImageUrl: referenceImageUrl || undefined,
+            imageMode: referenceImageUrl ? (replicateMode === 'replicate' ? 'clone' : 'inspire') : undefined,
+            modelId,
+          },
+        },
       });
     } catch (err: any) {
       console.error('Failed to create project:', err);
@@ -557,6 +564,53 @@ export default function ProjectWizard() {
                   </motion.div>
                 )}
               </AnimatePresence>
+            )}
+          </div>
+
+          {/* Connect API Section */}
+          <div className="space-y-3">
+            {!showApiConnect ? (
+              <button
+                onClick={() => setShowApiConnect(true)}
+                disabled={isSubmitting}
+                className="flex items-center gap-2 text-sm text-surface-400 hover:text-white transition-colors disabled:opacity-50"
+              >
+                <LinkIcon className="w-4 h-4" />
+                Connect API (Swagger/OpenAPI)
+              </button>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-white">Connect API</span>
+                  <button
+                    onClick={() => { setShowApiConnect(false); setSwaggerUrl(''); }}
+                    className="p-1 text-surface-400 hover:text-white transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <p className="text-xs text-surface-500">
+                  Provide a Swagger/OpenAPI URL and the AI will generate screens with real API integration.
+                </p>
+                <input
+                  type="url"
+                  value={swaggerUrl}
+                  onChange={(e) => setSwaggerUrl(e.target.value)}
+                  placeholder="https://api.example.com/swagger.json"
+                  disabled={isSubmitting}
+                  className="w-full px-3 py-2 bg-surface-900 border border-surface-700 rounded-lg text-sm text-white placeholder-surface-500 focus:outline-none focus:border-primary-500 disabled:opacity-50"
+                />
+                {swaggerUrl.trim() && (
+                  <div className="flex items-center gap-2 text-xs text-emerald-400">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    API URL will be analyzed during planning
+                  </div>
+                )}
+              </motion.div>
             )}
           </div>
 

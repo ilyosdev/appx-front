@@ -3,7 +3,6 @@ import {
   useRef,
   useCallback,
   useEffect,
-  useMemo,
 } from "react";
 import {
   ChevronRight,
@@ -15,10 +14,15 @@ import {
   MousePointer,
   Paperclip,
   ListChecks,
-  Zap,
-  Check,
+  Sparkles,
+  Puzzle,
+  Smartphone,
+  ChevronDown,
+  ArrowDown,
+  Dumbbell,
+  ChefHat,
+  Users,
 } from "lucide-react";
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -30,11 +34,16 @@ import {
 import type { ChatCompleteData, MultiFileStartParams, MultiFileModifyParams, MultiFileState } from "@/hooks/useProjectSocket";
 import { useAuthStore } from "@/stores/authStore";
 import { useBillingStore } from "@/stores/billingStore";
-import type { ScreenData, RecommendationItem, LocalMessage, GenerationStatus } from "@/types/canvas";
+import { useChatStore } from "@/stores/chatStore";
+import type { ScreenData, RecommendationItem, LocalMessage, GenerationStatus, ActionLogEvent } from "@/types/canvas";
 import { ChatMessageBubble } from "./ChatMessageBubble";
-import { GenerationStatusCard } from "./GenerationStatusCard";
+import { ChatProgressIndicator } from "./ChatProgressIndicator";
 import { ScreenListWidget } from "@/components/chat/ScreenListWidget";
 import { useElementSelection } from "@/hooks/useElementSelection";
+import { FeaturePicker } from "./FeaturePicker";
+import { useFeatureCatalog } from "@/hooks/useFeatures";
+import { ModelSelector } from "../chat/ModelSelector";
+import { useModelStore } from "@/stores/modelStore";
 
 function EditModeIndicator({
   screenName,
@@ -100,6 +109,50 @@ function SelectedElementIndicator({
   );
 }
 
+
+type ChatScope = "screen" | "app";
+
+const APP_WIDE_ACTION_PATTERN =
+  /\b(add|update|edit|change|fix|wire|connect|remove|delete|replace|rename|refactor|polish|improve|rework|make|turn|create|build|apply|sync)\b/;
+const APP_WIDE_TARGET_PATTERN =
+  /\b(app|project|navigation|routes?|tabs?|flows?|checkout|settings|addresses|payment(?:-methods)?|theme|colors?|styles?|images?|placeholders?|preview|all screens|every screen|across the app|throughout the app|whole app|entire app|global)\b/;
+
+function isAppWideRequest(message: string) {
+  const normalized = message.trim().toLowerCase();
+  if (!normalized) return false;
+
+  if (/\b(whole app|entire app|across the app|throughout the app|all screens|every screen|globally)\b/.test(normalized)) {
+    return true;
+  }
+
+  return APP_WIDE_ACTION_PATTERN.test(normalized) && APP_WIDE_TARGET_PATTERN.test(normalized);
+}
+
+function inferChatScope(params: {
+  message: string;
+  effectiveScreenId?: string;
+  effectiveParentScreenId?: string;
+  hasSelectedElement: boolean;
+  hasScreens: boolean;
+}): ChatScope {
+  const {
+    message,
+    effectiveScreenId,
+    effectiveParentScreenId,
+    hasSelectedElement,
+    hasScreens,
+  } = params;
+
+  if (hasSelectedElement) return "screen";
+  if (!hasScreens) return "screen";
+  // When user has explicitly selected a screen, always route to screen-level edit.
+  // This prevents "fix the 5th tab" from being classified as app-wide just because
+  // the message mentions "tab" — the user's screen selection is the strongest signal.
+  if (effectiveScreenId || effectiveParentScreenId) return "screen";
+  if (isAppWideRequest(message)) return "app";
+  return "app";
+}
+
 export interface ChatSidebarProps {
   projectId: string;
   projectName: string;
@@ -140,7 +193,16 @@ export interface ChatSidebarProps {
   } | null;
   onClearInitialRecommendations?: () => void;
   socketConnected?: boolean;
-  socketSendMessage?: (message: string, screenId?: string, parentScreenId?: string, planMode?: boolean) => void;
+  socketSendMessage?: (
+    message: string,
+    screenId?: string,
+    parentScreenId?: string,
+    planMode?: boolean,
+    enabledFeatures?: string[],
+    imageUrls?: string[],
+    modelId?: string,
+    planId?: string,
+  ) => void;
   socketChatState?: { isStreaming: boolean; accumulated: string; status: string; statusMessage: string };
   onSocketChatComplete?: (callback: (data: ChatCompleteData) => void) => void;
   onSocketChatError?: (callback: (error: string, code?: string) => void) => void;
@@ -151,6 +213,16 @@ export interface ChatSidebarProps {
   modifyMultiFile?: (params: MultiFileModifyParams) => void;
   /** Current multi-file generation state */
   multiFileState?: MultiFileState;
+  /** Action log events from socket */
+  actionLogs?: ActionLogEvent[];
+  /** Whether action logging is currently active (generation in progress) */
+  isActionLogActive?: boolean;
+  /** Enabled feature IDs for this project */
+  enabledFeatures?: string[];
+  /** Callback when features are toggled */
+  onFeaturesChange?: (features: string[]) => void;
+  /** Reference image URL from project creation (shown on first user message) */
+  referenceImageUrl?: string | null;
 }
 
 export function ChatSidebar({
@@ -176,7 +248,7 @@ export function ChatSidebar({
   onSetScreenLoading,
   onViewScreen,
   progressMessages,
-  activeProgress: activeProgressProp,
+  activeProgress: _activeProgressProp,
   onGenerateRecommended,
   onDismissRecommendations,
   screens,
@@ -189,49 +261,64 @@ export function ChatSidebar({
   onSocketChatComplete,
   onSocketChatError,
   onFilesChanged,
-  startMultiFileGeneration,
   modifyMultiFile,
   multiFileState,
+  actionLogs,
+  isActionLogActive: _isActionLogActive,
+  enabledFeatures = [],
+  onFeaturesChange,
+  referenceImageUrl,
 }: ChatSidebarProps) {
-  const [localMessages, setLocalMessages] = useState<LocalMessage[]>([]);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [streamingStatus, setStreamingStatus] = useState<string>("");
+  const {
+    messages: localMessages,
+    setMessages: setLocalMessages,
+    isStreaming,
+    setStreaming,
+    streamingStatus,
+    setStreamingStatus,
+    turnState,
+    startTurn,
+    completeTurn,
+    failTurn,
+    setAwaitingPlan,
+    resetTurn,
+    activePlanId,
+    setActivePlan,
+    clearActivePlan,
+  } = useChatStore();
   const [input, setInput] = useState("");
   const [historyInitialized, setHistoryInitialized] = useState(false);
-  const hasGeneratingScreens = screens && screens.some(s => s.isLoading);
+  const historyFetchCountRef = useRef(0);
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus>({
     isGenerating: false,
     lastCompletedCount: 0,
     pendingRecommendations: null,
   });
-  const [planMode, setPlanMode] = useState(true);
+  const [planMode, setPlanMode] = useState(false);
+  const planModeRef = useRef(planMode);
+  useEffect(() => { planModeRef.current = planMode; }, [planMode]);
+  const [isPlanImplementing, setIsPlanImplementing] = useState(false);
+  const [showFeaturePicker, setShowFeaturePicker] = useState(false);
+  const { data: featureCatalog } = useFeatureCatalog();
 
-  // Extract pending planned screens (planning done but skeletons not yet created)
-  const pendingPlannedScreens = useMemo(() => {
-    if (hasGeneratingScreens) return null; // real screens exist, no gap
-    const plannedMsg = [...localMessages].reverse().find(
-      m => (m.metadata?.type as string) === 'planned_screens' && m.metadata?.screens
-    );
-    if (!plannedMsg) return null;
-    const plannedScreens = plannedMsg.metadata!.screens as Array<{
-      id: string; name: string; type: string; description: string; status: string;
-    }>;
-    // Null once all planned screens have been created
-    if (screens && screens.length > 0) {
-      const existingNames = new Set(screens.map(s => s.name.toLowerCase()));
-      if (plannedScreens.every(ps => existingNames.has(ps.name.toLowerCase()))) return null;
-    }
-    return plannedScreens.map((s, i) => ({
-      id: s.id,
-      name: s.name,
-      type: s.type || 'custom',
-      description: s.description || '',
-      status: 'pending' as const,
-      order: i,
-    }));
-  }, [localMessages, hasGeneratingScreens, screens]);
+  // Screen selector: which screen the user wants to target for edits
+  // Default to undefined (general mode) — user explicitly picks a screen when they want to edit
+  const [chatScreenId, setChatScreenId] = useState<string | undefined>(undefined);
+  const [screenDropdownOpen, setScreenDropdownOpen] = useState(false);
+  const screenDropdownRef = useRef<HTMLDivElement>(null);
 
-  const isActiveGeneration = generationStatus.isGenerating || hasGeneratingScreens || !!pendingPlannedScreens;
+  // Close screen dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (screenDropdownRef.current && !screenDropdownRef.current.contains(e.target as Node)) {
+        setScreenDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedScreen = screens?.find((s) => s.id === chatScreenId);
 
   const [pendingImages, setPendingImages] = useState<Array<{
     id: string;
@@ -241,27 +328,26 @@ export function ChatSidebar({
     isUploading: boolean;
     error: boolean;
   }>>([]);
+  const [isScrolledAway, setIsScrolledAway] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollAnchorRef = useRef<HTMLDivElement>(null);
+  const userScrolledRef = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastProcessedTriggerRef = useRef<string | null>(null);
+  // Track message IDs that have already been appended to prevent duplicates
+  const processedMessageIdsRef = useRef(new Set<string>());
+  // Guard to prevent double-send (ref for synchronous check, survives across renders)
+  const sendingRef = useRef(false);
+  // Guard to prevent duplicate error handling per turn
+  const errorHandledRef = useRef(false);
   const chatQueryClient = useQueryClient();
 
   // Element selection state
   const { selectedElement, isSelectionMode, setSelectionMode, clearSelection } = useElementSelection();
 
-  // Compute active progress: prefer prop from Canvas (derived from socket states), fallback to progressMessages
-  const activeProgress = useMemo(() => {
-    if (activeProgressProp) return activeProgressProp;
-    if (!progressMessages) return null;
-    for (const [, data] of progressMessages) {
-      if ((data as { overallProgress: number }).overallProgress < 100) return data as { overallProgress: number; currentScreen?: { name: string } };
-    }
-    return null;
-  }, [activeProgressProp, progressMessages]);
-
-  const { data: historyData, isLoading: isLoadingHistory } = useQuery({
+  const { data: historyData, isLoading: isLoadingHistory, isError: isHistoryError } = useQuery({
     queryKey: ["chatHistory", projectId],
     queryFn: async () => {
       const response = await chatApi.getHistory(projectId, { limit: 100 });
@@ -269,54 +355,131 @@ export function ChatSidebar({
       return (response.data as unknown as { data: { messages: unknown[] } }).data;
     },
     enabled: !!projectId,
-    staleTime: 0, // Always consider data stale
-    gcTime: 0, // Don't cache - always fetch fresh data on mount
-    refetchOnMount: "always", // Refetch when component mounts
+    staleTime: 5000, // Data is fresh for 5 seconds — prevents duplicate fetches on mount
+    refetchOnMount: true, // Refetch on mount only if data is stale
     refetchInterval: !historyInitialized ? 3000 : false, // Poll until history loads
+    retry: 2, // Retry failed requests twice before giving up
   });
 
   // Reset history when projectId changes
   useEffect(() => {
     setHistoryInitialized(false);
     setLocalMessages([]);
+    resetTurn();
+    processedMessageIdsRef.current.clear();
+    historyFetchCountRef.current = 0;
   }, [projectId]);
 
 
   useEffect(() => {
-    if (historyData?.messages && !historyInitialized) {
-      const mappedMessages = (historyData.messages as Array<{
-        id: string;
-        role: "user" | "assistant";
-        message: string;
-        createdScreenId?: string;
-        metadata?: LocalMessage["metadata"];
-      }>).map((msg) => ({
+    if (!historyData?.messages || historyInitialized) return;
+
+    historyFetchCountRef.current += 1;
+
+    // Restore persisted action logs from localStorage
+    let savedLogs: Record<string, unknown> = {};
+    if (projectId) {
+      try {
+        savedLogs = JSON.parse(localStorage.getItem(`actionLogs:${projectId}`) || '{}');
+      } catch { /* ignore */ }
+    }
+
+    const rawMessages = historyData.messages as Array<{
+      id: string;
+      role: "user" | "assistant";
+      message: string;
+      createdScreenId?: string;
+      metadata?: LocalMessage["metadata"];
+    }>;
+
+    let firstUserMessageSeen = false;
+    const mappedMessages = rawMessages.map((msg) => {
+      // Inject reference image into the first user message if project has one
+      const isFirstUser = msg.role === 'user' && !firstUserMessageSeen;
+      if (isFirstUser) firstUserMessageSeen = true;
+      const existingImageUrls = (msg.metadata?.imageUrls as string[] | undefined) || [];
+      const shouldInjectImage = isFirstUser && referenceImageUrl && existingImageUrls.length === 0;
+
+      return {
         id: msg.id,
         role: msg.role,
         content: msg.message,
         createdScreenId: msg.createdScreenId,
-        metadata: msg.metadata,
-      }));
-      // Only mark initialized when we actually have messages.
-      // Design system generation saves chat messages asynchronously,
-      // so the first fetch may return empty — keep polling until messages arrive.
-      if (mappedMessages.length > 0) {
-        setLocalMessages(mappedMessages);
-        setHistoryInitialized(true);
-      }
-    }
-  }, [historyData, historyInitialized]);
+        // Mark error messages from DB so they render with error styling
+        error: !!(msg.metadata as Record<string, unknown> | undefined)?.error,
+        metadata: {
+          ...msg.metadata,
+          // Inject reference image on first user message
+          ...(shouldInjectImage ? { imageUrls: [referenceImageUrl] } : {}),
+          // Merge persisted action logs from localStorage if not already in metadata
+          ...(msg.role === 'assistant' && !msg.metadata?.actionLogs && savedLogs[msg.id]
+            ? { actionLogs: savedLogs[msg.id] }
+            : {}),
+        },
+      };
+    });
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (mappedMessages.length > 0) {
+      // Clear processed IDs and re-seed with history message IDs
+      processedMessageIdsRef.current.clear();
+      for (const msg of mappedMessages) {
+        processedMessageIdsRef.current.add(msg.id);
+      }
+      setLocalMessages(mappedMessages);
+      setHistoryInitialized(true);
+    } else if (historyFetchCountRef.current >= 5) {
+      // After ~15 seconds of polling with no messages, accept that the project
+      // has no chat history yet (e.g., new project). Stop polling and show the
+      // empty state so the user can start chatting.
+      setHistoryInitialized(true);
     }
-  }, [localMessages]);
+  }, [historyData, historyInitialized, projectId]);
+
+  // If the history query failed after retries, stop showing skeleton loader.
+  // The user can still use chat normally; messages will be saved going forward.
+  useEffect(() => {
+    if (isHistoryError && !historyInitialized) {
+      setHistoryInitialized(true);
+    }
+  }, [isHistoryError, historyInitialized]);
+
+  // Detect when user scrolls away from bottom
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      const isNearBottom = distanceFromBottom < 80;
+      userScrolledRef.current = !isNearBottom;
+      setIsScrolledAway(!isNearBottom);
+    };
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Smooth auto-scroll when new messages arrive (unless user scrolled up)
+  useEffect(() => {
+    if (userScrolledRef.current) return;
+    if (scrollAnchorRef.current) {
+      scrollAnchorRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [localMessages, actionLogs]);
+
+  const scrollToBottom = useCallback(() => {
+    userScrolledRef.current = false;
+    setIsScrolledAway(false);
+    if (scrollAnchorRef.current) {
+      scrollAnchorRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, []);
 
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
+      }
+      if (chatTimeoutRef.current) {
+        clearTimeout(chatTimeoutRef.current);
       }
     };
   }, []);
@@ -345,26 +508,121 @@ export function ChatSidebar({
 
   const assistantMessageIdRef = useRef<string | null>(null);
   const addedSkeletonNameRef = useRef<string | null>(null);
+  const actionLogsRef = useRef<ActionLogEvent[]>([]);
+  actionLogsRef.current = actionLogs;
   const effectiveScreenIdRef = useRef<string | undefined>(undefined);
+  const chatTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!onSocketChatComplete) return;
 
     onSocketChatComplete((data: ChatCompleteData) => {
+      if (chatTimeoutRef.current) {
+        clearTimeout(chatTimeoutRef.current);
+        chatTimeoutRef.current = null;
+      }
+
       const assistantMessageId = assistantMessageIdRef.current;
       const addedSkeletonName = addedSkeletonNameRef.current;
 
+      // Prefer live action logs (granular per-tool) over server logs (coarse gateway-level)
+      // Use ref to avoid stale closure — actionLogs state may already be cleared
+      const liveActionLogs = actionLogsRef.current;
+      const resolvedActionLogs = liveActionLogs && liveActionLogs.length > (data.actionLogs?.length || 0)
+        ? [...liveActionLogs]
+        : data.actionLogs;
+
       setLocalMessages((prev) => {
-        let newMessages = prev.map((msg) =>
-          msg.id === assistantMessageId
-            ? {
-                ...msg,
-                id: data.messageId || assistantMessageId,
+        // If timeout already fired, the message may have been updated with fallback text.
+        // Still find and update it with the real content using the ref (not cleared on timeout).
+        const hasMatchingMessage = assistantMessageId && prev.some((msg) => msg.id === assistantMessageId);
+
+        let newMessages: LocalMessage[];
+
+        const isModifyFailed = data.intent === 'modify_failed';
+
+        if (hasMatchingMessage) {
+          // Normal path: update the existing placeholder message
+          newMessages = prev.map((msg) =>
+            msg.id === assistantMessageId
+              ? {
+                  ...msg,
+                  id: data.messageId || assistantMessageId,
+                  content: data.content,
+                  isStreaming: false,
+                  ...(isModifyFailed ? { warning: true } : {}),
+                  metadata: {
+                    ...msg.metadata,
+                    executionMode: planModeRef.current ? "Plan" : "Direct",
+                    ...(resolvedActionLogs ? { actionLogs: resolvedActionLogs } : {}),
+                    ...(data.changeSummary ? { changeSummary: data.changeSummary } : {}),
+                    ...(data.planId ? { planId: data.planId, planVersion: data.planVersion } : {}),
+                    ...(data.planSteps ? { planSteps: data.planSteps } : {}),
+                  },
+                }
+              : msg,
+          );
+        } else {
+          // Race condition recovery: no matching placeholder message found.
+          // This happens when chat:complete arrives before the assistant placeholder
+          // was added to state, or when the ID doesn't match due to timing.
+          // Check broader: streaming recovery may have already appended a message
+          // with a different ID or the streaming flag still set.
+          const streamingOrAltMatch = prev.some(
+            (msg) =>
+              msg.id === data.messageId ||
+              (msg.role === 'assistant' && msg.isStreaming),
+          );
+          if (streamingOrAltMatch) {
+            // Update the existing streaming/alt message instead of appending a duplicate
+            newMessages = prev.map((msg) =>
+              (msg.id === data.messageId || (msg.role === 'assistant' && msg.isStreaming))
+                ? {
+                    ...msg,
+                    id: data.messageId || msg.id,
+                    content: data.content,
+                    isStreaming: false,
+                    ...(isModifyFailed ? { warning: true } : {}),
+                    metadata: {
+                      ...msg.metadata,
+                      executionMode: planModeRef.current ? "Plan" : "Direct",
+                      ...(data.changeSummary ? { changeSummary: data.changeSummary } : {}),
+                      ...(resolvedActionLogs ? { actionLogs: resolvedActionLogs } : {}),
+                      ...(data.planId ? { planId: data.planId, planVersion: data.planVersion } : {}),
+                      ...(data.planSteps ? { planSteps: data.planSteps } : {}),
+                    },
+                  }
+                : msg,
+            );
+          } else {
+            // Truly no match anywhere — append as new message (if not already processed)
+            const recoveryId = data.messageId || assistantMessageId || `assistant-recovery-${Date.now()}`;
+            if (processedMessageIdsRef.current.has(recoveryId)) {
+              newMessages = prev; // skip duplicate
+            } else {
+              console.warn('[ChatSidebar] chat:complete had no matching assistantMessageId, appending as new message', {
+                assistantMessageId,
+                dataMessageId: data.messageId,
+              });
+              processedMessageIdsRef.current.add(recoveryId);
+              const newAssistantMessage: LocalMessage = {
+                id: recoveryId,
+                role: "assistant",
                 content: data.content,
                 isStreaming: false,
-              }
-            : msg,
-        );
+                ...(isModifyFailed ? { warning: true } : {}),
+                metadata: {
+                  executionMode: planModeRef.current ? "Plan" : "Direct",
+                  ...(resolvedActionLogs ? { actionLogs: resolvedActionLogs } : {}),
+                  ...(data.changeSummary ? { changeSummary: data.changeSummary } : {}),
+                  ...(data.planId ? { planId: data.planId, planVersion: data.planVersion } : {}),
+                  ...(data.planSteps ? { planSteps: data.planSteps } : {}),
+                },
+              };
+              newMessages = [...prev, newAssistantMessage];
+            }
+          }
+        }
 
         if (data.pendingRecommendations && data.pendingRecommendations.length > 0) {
           const essential = data.pendingRecommendations
@@ -416,9 +674,35 @@ export function ChatSidebar({
         return newMessages;
       });
 
-      setIsStreaming(false);
+      setStreaming(false);
+      sendingRef.current = false;
+      setIsPlanImplementing(false);
+
+      // Track active plan from structured plan responses
+      if (data.planId && data.planSteps && data.planSteps.length > 0) {
+        setActivePlan(data.planId, data.planSteps as import("@/stores/chatStore").PlanStep[], data.planVersion || 1);
+      }
+
+      if (planModeRef.current && !data.screen) {
+        setAwaitingPlan();
+      } else {
+        completeTurn();
+      }
       onGenerationEnd?.();
+
+      // Always clear screen loading state on completion — prevents hanging "Generating screen..." overlay
+      const loadingScreenId = effectiveScreenIdRef.current;
+      if (loadingScreenId) {
+        onSetScreenLoading?.(loadingScreenId, false);
+      }
+
       chatQueryClient.invalidateQueries({ queryKey: ["chatHistory", projectId] });
+
+      // Auto-focus input after AI response completes
+      setTimeout(() => inputRef.current?.focus(), 150);
+
+      // Scroll to bottom on completion
+      scrollToBottom();
 
       if (data.screen) {
         onScreenCreated?.({
@@ -435,35 +719,70 @@ export function ChatSidebar({
       assistantMessageIdRef.current = null;
       addedSkeletonNameRef.current = null;
     });
-  }, [onSocketChatComplete, onGenerationEnd, onScreenCreated, onRemoveSkeletons, projectId, chatQueryClient]);
+  }, [onSocketChatComplete, onGenerationEnd, onScreenCreated, onRemoveSkeletons, onSetScreenLoading, projectId, chatQueryClient]);
 
   useEffect(() => {
     if (!onSocketChatError) return;
 
     onSocketChatError((error: string, code?: string) => {
+      // Guard: skip if we already handled an error for this turn
+      if (errorHandledRef.current) {
+        console.warn('[ChatSidebar] Duplicate chat:error ignored (already handled for this turn)');
+        return;
+      }
+      errorHandledRef.current = true;
+
+      if (chatTimeoutRef.current) {
+        clearTimeout(chatTimeoutRef.current);
+        chatTimeoutRef.current = null;
+      }
+
       const assistantMessageId = assistantMessageIdRef.current;
       const addedSkeletonName = addedSkeletonNameRef.current;
       const effectiveScreenId = effectiveScreenIdRef.current;
 
-      if (code === 'LIMIT_EXCEEDED' || code === 'INSUFFICIENT_CREDITS') {
+      if (code === 'LIMIT_EXCEEDED' || code === 'INSUFFICIENT_CREDITS' || code === 'DAILY_LIMIT_EXCEEDED') {
         const { handleBillingError, currentPlan } = useBillingStore.getState();
         handleBillingError(code, error, currentPlan, {});
       }
 
-      setLocalMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === assistantMessageId
-            ? {
-                ...msg,
-                content: `Error: ${error}. If generation completed, refresh to see results.`,
-                isStreaming: false,
-                error: true,
-              }
-            : msg,
-        ),
-      );
+      setLocalMessages((prev) => {
+        const hasMatchingMessage = assistantMessageId && prev.some((msg) => msg.id === assistantMessageId);
+        if (hasMatchingMessage) {
+          return prev.map((msg) =>
+            msg.id === assistantMessageId
+              ? {
+                  ...msg,
+                  content: `Error: ${error}. If generation completed, refresh to see results.`,
+                  isStreaming: false,
+                  error: true,
+                }
+              : msg,
+          );
+        }
+        // Race condition recovery: append error as new message if no placeholder found
+        const errorRecoveryId = assistantMessageId || `assistant-error-${Date.now()}`;
+        if (processedMessageIdsRef.current.has(errorRecoveryId)) {
+          return prev; // skip duplicate
+        }
+        console.warn('[ChatSidebar] chat:error had no matching assistantMessageId, appending as new message');
+        processedMessageIdsRef.current.add(errorRecoveryId);
+        return [
+          ...prev,
+          {
+            id: errorRecoveryId,
+            role: "assistant" as const,
+            content: `Error: ${error}. If generation completed, refresh to see results.`,
+            isStreaming: false,
+            error: true,
+          },
+        ];
+      });
 
-      setIsStreaming(false);
+      setStreaming(false);
+      sendingRef.current = false;
+      setIsPlanImplementing(false);
+      failTurn(error, true);
       onGenerationEnd?.();
 
       if (effectiveScreenId) {
@@ -486,13 +805,38 @@ export function ChatSidebar({
     if (!socketChatState) return;
 
     if (socketChatState.isStreaming && assistantMessageIdRef.current) {
-      setLocalMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === assistantMessageIdRef.current
-            ? { ...msg, content: socketChatState.accumulated, isStreaming: true }
-            : msg,
-        ),
-      );
+      const targetId = assistantMessageIdRef.current;
+      setLocalMessages((prev) => {
+        const hasMatch = prev.some((msg) => msg.id === targetId);
+        if (hasMatch) {
+          // Normal path: update the existing placeholder
+          return prev.map((msg) =>
+            msg.id === targetId
+              ? { ...msg, content: socketChatState.accumulated, isStreaming: true }
+              : msg,
+          );
+        }
+        // Race condition: streaming data arrived but the placeholder message hasn't
+        // been committed to state yet (React batching). Append it so content isn't lost.
+        // But first check if this message ID was already processed (avoid duplicate).
+        if (socketChatState.accumulated) {
+          if (processedMessageIdsRef.current.has(targetId)) return prev;
+          // Also check if chat:complete already finalized a message with this ID
+          const alreadyExists = prev.some((msg) => msg.id === targetId);
+          if (alreadyExists) return prev;
+          processedMessageIdsRef.current.add(targetId);
+          return [
+            ...prev,
+            {
+              id: targetId,
+              role: "assistant" as const,
+              content: socketChatState.accumulated,
+              isStreaming: true,
+            },
+          ];
+        }
+        return prev;
+      });
     }
 
     if (socketChatState.statusMessage) {
@@ -523,127 +867,194 @@ export function ChatSidebar({
 
     // Update streaming status during generation
     if (isNowGenerating && multiFileState.currentFile) {
-      setStreamingStatus(`Generating ${multiFileState.currentFile}...`);
+      const { completed, total } = multiFileState.progress;
+      const shortName = multiFileState.currentFile.split("/").pop() || multiFileState.currentFile;
+      setStreamingStatus(
+        total > 0
+          ? `Generating ${shortName} (${completed + 1}/${total})...`
+          : `Generating ${shortName}...`,
+      );
     }
 
     // Generation just completed
     if (wasGenerating && !isNowGenerating) {
+      if (chatTimeoutRef.current) {
+        clearTimeout(chatTimeoutRef.current);
+        chatTimeoutRef.current = null;
+      }
+
+      setGenerationStatus((prev) => ({
+        ...prev,
+        isGenerating: false,
+      }));
+
       const assistantMessageId = assistantMessageIdRef.current;
 
       if (multiFileState.error) {
         // Error case
-        setLocalMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === assistantMessageId
-              ? {
-                  ...msg,
-                  content: `Error during multi-file generation: ${multiFileState.error}`,
-                  isStreaming: false,
-                  error: true,
-                }
-              : msg,
-          ),
-        );
+        setLocalMessages((prev) => {
+          const errorDbId = multiFileState.completedMessageId;
+          const hasMatch = prev.some((msg) =>
+            (assistantMessageId && msg.id === assistantMessageId) ||
+            (errorDbId && msg.id === errorDbId)
+          );
+          if (hasMatch) {
+            return prev.map((msg) =>
+              (msg.id === assistantMessageId || (errorDbId && msg.id === errorDbId))
+                ? {
+                    ...msg,
+                    content: `Error during multi-file generation: ${multiFileState.error}`,
+                    isStreaming: false,
+                    error: true,
+                  }
+                : msg,
+            );
+          }
+          // Race condition recovery: append error as new message
+          const multiErrorId = assistantMessageId || `assistant-multi-error-${Date.now()}`;
+          if (processedMessageIdsRef.current.has(multiErrorId)) return prev;
+          processedMessageIdsRef.current.add(multiErrorId);
+          return [
+            ...prev,
+            {
+              id: multiErrorId,
+              role: "assistant" as const,
+              content: `Error during multi-file generation: ${multiFileState.error}`,
+              isStreaming: false,
+              error: true,
+            },
+          ];
+        });
+        failTurn(multiFileState.error, true);
       } else {
         // Success case
         const fileCount = multiFileState.files.size;
         const fileNames = Array.from(multiFileState.files.keys());
-        const screenFiles = fileNames.filter(f => f.includes('/app/') || f.includes('/screen'));
-        const utilFiles = fileNames.filter(f => !screenFiles.includes(f));
+        const completedLogs = multiFileState.completedActionLogs;
+        const hasCreateActions = completedLogs?.some((log) => log.type === "create_file");
+        const hasEditActions = completedLogs?.some((log) => log.type === "edit_file");
+        const defaultFileAction = hasCreateActions && !hasEditActions ? "created" : "modified";
+        const validationSummary = {
+          passed: multiFileState.validation?.filter((item) => item.status === "passed").length || 0,
+          failed: multiFileState.validation?.filter((item) => item.status === "failed").length || 0,
+          skipped: multiFileState.validation?.filter((item) => item.status === "skipped").length || 0,
+        };
 
-        let summary = `Generated ${fileCount} files successfully.`;
-        if (screenFiles.length > 0) {
-          summary += `\n\n**Screens (${screenFiles.length}):** ${screenFiles.map(f => f.split('/').pop()).join(', ')}`;
-        }
-        if (utilFiles.length > 0) {
-          summary += `\n\n**Utilities (${utilFiles.length}):** ${utilFiles.map(f => f.split('/').pop()).join(', ')}`;
-        }
-        summary += '\n\nSelect a file from the file selector above the preview to browse the generated code.';
+        // Use the DB messageId from backend so refresh picks up the same message
+        const dbMessageId = multiFileState.completedMessageId;
+        const summary =
+          multiFileState.summary ||
+          `${defaultFileAction === "created" ? "Generated" : "Updated"} ${fileCount} files successfully.`;
 
-        setLocalMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === assistantMessageId
-              ? { ...msg, content: summary, isStreaming: false }
-              : msg,
-          ),
-        );
+        setLocalMessages((prev) => {
+          const hasMatch = prev.some((msg) =>
+            (assistantMessageId && msg.id === assistantMessageId) ||
+            (dbMessageId && msg.id === dbMessageId)
+          );
+          const artifactMetadata = {
+            type: "artifact" as const,
+            summary,
+            files: fileNames.map((path) => ({
+              path,
+              action: defaultFileAction,
+            })),
+            validation: validationSummary,
+            ...(completedLogs ? { actionLogs: completedLogs } : {}),
+          };
+          const contentText = defaultFileAction === "created" ? "App generation complete" : "Project update applied";
+
+          if (hasMatch) {
+            return prev.map((msg) =>
+              (msg.id === assistantMessageId || (dbMessageId && msg.id === dbMessageId))
+                ? {
+                    ...msg,
+                    id: dbMessageId || assistantMessageId,
+                    content: contentText,
+                    isStreaming: false,
+                    metadata: {
+                      ...(msg.metadata || {}),
+                      ...artifactMetadata,
+                    },
+                  }
+                : msg,
+            );
+          }
+
+          // Consolidation: if the last assistant message is also an artifact/generation result,
+          // update it in-place instead of appending a separate bubble.
+          const lastAssistantIdx = prev.length - 1;
+          const lastMsg = lastAssistantIdx >= 0 ? prev[lastAssistantIdx] : null;
+          if (
+            lastMsg &&
+            lastMsg.role === "assistant" &&
+            !lastMsg.isStreaming &&
+            lastMsg.metadata?.type === "artifact"
+          ) {
+            // Merge file lists and update counts
+            const existingFiles = (lastMsg.metadata.files as Array<{ path: string; action: string }>) || [];
+            const mergedFilesMap = new Map<string, string>();
+            for (const f of existingFiles) mergedFilesMap.set(f.path, f.action);
+            for (const f of artifactMetadata.files) mergedFilesMap.set(f.path, f.action);
+            const mergedFiles = Array.from(mergedFilesMap.entries()).map(([path, action]) => ({ path, action }));
+            const mergedSummary = `${defaultFileAction === "created" ? "Generated" : "Updated"} ${mergedFiles.length} files successfully.`;
+            const updated = [...prev];
+            updated[lastAssistantIdx] = {
+              ...lastMsg,
+              id: dbMessageId || lastMsg.id,
+              content: contentText,
+              metadata: {
+                ...(lastMsg.metadata || {}),
+                ...artifactMetadata,
+                summary: mergedSummary,
+                files: mergedFiles,
+              },
+            };
+            return updated;
+          }
+
+          // Race condition recovery: append as new message
+          const multiRecoveryId = dbMessageId || assistantMessageId || `assistant-multi-${Date.now()}`;
+          if (processedMessageIdsRef.current.has(multiRecoveryId)) return prev;
+          console.warn('[ChatSidebar] multi-file complete had no matching assistantMessageId, appending');
+          processedMessageIdsRef.current.add(multiRecoveryId);
+          return [
+            ...prev,
+            {
+              id: multiRecoveryId,
+              role: "assistant" as const,
+              content: contentText,
+              isStreaming: false,
+              metadata: artifactMetadata,
+            },
+          ];
+        });
+
+        // Persist action logs to localStorage for reload survival
+        if (completedLogs && projectId) {
+          try {
+            const storageKey = `actionLogs:${projectId}`;
+            const existing = JSON.parse(localStorage.getItem(storageKey) || '{}');
+            const storageMessageId = dbMessageId || assistantMessageId || `assistant-${Date.now()}`;
+            existing[storageMessageId] = completedLogs;
+            const keys = Object.keys(existing);
+            if (keys.length > 20) {
+              for (const k of keys.slice(0, keys.length - 20)) delete existing[k];
+            }
+            localStorage.setItem(storageKey, JSON.stringify(existing));
+          } catch { /* ignore storage errors */ }
+        }
+        completeTurn();
       }
 
-      setIsStreaming(false);
+      setStreaming(false);
+      sendingRef.current = false;
       onGenerationEnd?.();
+      chatQueryClient.invalidateQueries({ queryKey: ["chatHistory", projectId] });
       assistantMessageIdRef.current = null;
+      addedSkeletonNameRef.current = null;
+      effectiveScreenIdRef.current = undefined;
     }
-  }, [multiFileState, onGenerationEnd]);
-
-  // Detect whether a user message describes a full app (multi-screen intent)
-  const detectMultiAppIntent = useCallback((message: string): boolean => {
-    const lower = message.toLowerCase();
-    // Keywords that signal the user wants an entire app, not a single screen
-    const appKeywords = [
-      'build me an app',
-      'build an app',
-      'create an app',
-      'create a app',
-      'make me an app',
-      'make an app',
-      'build me a ',
-      'create a multi-screen',
-      'multi-screen app',
-      'full app',
-      'entire app',
-      'complete app',
-      'application with',
-      'application that',
-      'build a ',
-      'create a ',
-    ];
-    const hasAppKeyword = appKeywords.some(kw => lower.includes(kw));
-    // Also check for phrases like "app that..." or "application for..."
-    const appPatterns = /\b(app|application)\b.*\b(that|for|with|to|which)\b/i;
-    return hasAppKeyword || appPatterns.test(lower);
-  }, []);
-
-  // Parse app description into screens array for multi-file generation
-  const parseScreensFromDescription = useCallback((message: string): Array<{ name: string; description: string }> => {
-    const screens: Array<{ name: string; description: string }> = [];
-    // Look for explicit screen mentions
-    const screenPatterns = [
-      /(?:with|include|has|having|containing)\s+(?:a\s+)?(?:screens?|pages?)\s*(?:like|such as|:|\-)\s*(.+)/i,
-      /(?:screens?|pages?):\s*(.+)/i,
-    ];
-
-    let screenList: string | null = null;
-    for (const pattern of screenPatterns) {
-      const match = message.match(pattern);
-      if (match) {
-        screenList = match[1];
-        break;
-      }
-    }
-
-    if (screenList) {
-      // Split by comma, "and", semicolons
-      const items = screenList.split(/[,;]|\band\b/i).map(s => s.trim()).filter(Boolean);
-      for (const item of items) {
-        const name = item.replace(/\b(screen|page)\b/gi, '').trim();
-        if (name) {
-          screens.push({ name, description: name });
-        }
-      }
-    }
-
-    // If no explicit screens found, generate sensible defaults from the app type
-    if (screens.length === 0) {
-      screens.push(
-        { name: "Home", description: "Main home/landing screen" },
-        { name: "Details", description: "Detail view screen" },
-        { name: "Profile", description: "User profile screen" },
-        { name: "Settings", description: "App settings screen" },
-      );
-    }
-
-    return screens;
-  }, []);
+  }, [multiFileState, onGenerationEnd, projectId, chatQueryClient]);
 
   const sendMessage = useCallback(
     (
@@ -654,82 +1065,38 @@ export function ChatSidebar({
     ) => {
       if (!message.trim() || isStreaming) return;
 
-      // --- Multi-file intent detection ---
-      // Only trigger for first message in a new project (no screens, no history)
-      const isFirstMessage = localMessages.length === 0 && (!screens || screens.length === 0);
+      // Guard: don't send chat messages while multi-file generation is in progress
+      if (multiFileState?.isGenerating) return;
+
+      // Synchronous double-send guard (survives React batching)
+      if (sendingRef.current) return;
+      sendingRef.current = true;
+      // Reset the guard after a short delay to allow the next message
+      setTimeout(() => { sendingRef.current = false; }, 500);
+
+      // Reset error-handled flag for the new turn
+      errorHandledRef.current = false;
+
       const effectiveScreenId = overrideScreenId || screenId;
       const effectiveParentScreenId = messageParentScreenId || parentScreenId;
-
-      if (
-        isFirstMessage &&
-        !effectiveScreenId &&
-        !effectiveParentScreenId &&
-        startMultiFileGeneration &&
-        detectMultiAppIntent(message)
-      ) {
-        // Route to multi-file generation
-        const parsedScreens = parseScreensFromDescription(message);
-
-        const userMessageId = `user-${Date.now()}`;
-        const assistantMessageId = `assistant-${Date.now()}`;
-        assistantMessageIdRef.current = assistantMessageId;
-
-        setLocalMessages((prev) => [
-          ...prev,
-          { id: userMessageId, role: "user", content: message },
-          {
-            id: assistantMessageId,
-            role: "assistant",
-            content: `Generating a full multi-file app with ${parsedScreens.length} screens: ${parsedScreens.map(s => s.name).join(", ")}...`,
-            isStreaming: true,
-          },
-        ]);
-        setIsStreaming(true);
-        setStreamingStatus("Starting multi-file generation...");
-        onGenerationStart?.();
-
-        startMultiFileGeneration({
-          appDescription: message,
-          screens: parsedScreens,
-        });
-
-        return;
-      }
-
-      // --- Multi-file modify: if we already have multi-file content, route modifications there ---
-      if (
-        modifyMultiFile &&
-        multiFileState &&
-        multiFileState.files.size > 0 &&
-        !multiFileState.isGenerating &&
-        !effectiveScreenId &&
-        !effectiveParentScreenId
-      ) {
-        const userMessageId = `user-${Date.now()}`;
-        const assistantMessageId = `assistant-${Date.now()}`;
-        assistantMessageIdRef.current = assistantMessageId;
-
-        setLocalMessages((prev) => [
-          ...prev,
-          { id: userMessageId, role: "user", content: message },
-          {
-            id: assistantMessageId,
-            role: "assistant",
-            content: "Modifying files...",
-            isStreaming: true,
-          },
-        ]);
-        setIsStreaming(true);
-        setStreamingStatus("Modifying files...");
-        onGenerationStart?.();
-
-        modifyMultiFile({ prompt: message });
-        return;
-      }
+      const resolvedScope = inferChatScope({
+        message,
+        effectiveScreenId,
+        effectiveParentScreenId,
+        hasSelectedElement: !!selectedElement,
+        hasScreens: (screens?.length || 0) > 0,
+      });
+      const useMultiFileModify =
+        !!modifyMultiFile &&
+        !planMode &&
+        resolvedScope === "app" &&
+        (screens?.length || 0) > 0;
 
       const userMessageId = `user-${Date.now()}`;
       const assistantMessageId = `assistant-${Date.now()}`;
       assistantMessageIdRef.current = assistantMessageId;
+      processedMessageIdsRef.current.add(userMessageId);
+      processedMessageIdsRef.current.add(assistantMessageId);
 
       setLocalMessages((prev) => [
         ...prev,
@@ -737,7 +1104,10 @@ export function ChatSidebar({
           id: userMessageId,
           role: "user",
           content: message,
-          ...(imageUrls?.length ? { metadata: { imageUrls } } : {}),
+          metadata: {
+            ...(imageUrls?.length ? { imageUrls } : {}),
+            executionMode: planMode ? "Plan" : "Direct",
+          },
         },
         {
           id: assistantMessageId,
@@ -746,14 +1116,20 @@ export function ChatSidebar({
           isStreaming: true,
         },
       ]);
-      setIsStreaming(true);
+      setStreaming(true);
       setStreamingStatus("Processing...");
+      startTurn(planMode ? "Plan" : "Direct");
       setGenerationStatus((prev) => ({ ...prev, isGenerating: true }));
-      onGenerationStart?.();
-
-      effectiveScreenIdRef.current = effectiveScreenId;
-      if (effectiveScreenId) {
-        onSetScreenLoading?.(effectiveScreenId, true, "Updating screen...");
+      // Only signal generation start and set screen loading for non-plan mode
+      // Plan mode is analysis-only — it should NOT block the preview
+      if (!planMode) {
+        onGenerationStart?.();
+        effectiveScreenIdRef.current = effectiveScreenId;
+        if (effectiveScreenId) {
+          onSetScreenLoading?.(effectiveScreenId, true, "Updating screen...");
+        }
+      } else {
+        effectiveScreenIdRef.current = effectiveScreenId;
       }
 
       let addedSkeletonName: string | null = null;
@@ -791,8 +1167,45 @@ export function ChatSidebar({
         }
       }
 
-      if (socketConnected && socketSendMessage) {
-        socketSendMessage(message, overrideScreenId || screenId, effectiveParentScreenId, planMode);
+      if (socketConnected && (socketSendMessage || useMultiFileModify)) {
+        const modelId = useModelStore.getState().getEffectiveModelId() || undefined;
+        if (useMultiFileModify) {
+          setStreamingStatus("Applying project-wide changes...");
+          modifyMultiFile?.({
+            userRequest: message,
+            modelId,
+          });
+        } else if (socketSendMessage) {
+          // Pass activePlanId when in plan mode for refinement detection
+          const effectivePlanId = planMode ? (useChatStore.getState().activePlanId || undefined) : undefined;
+          socketSendMessage(message, overrideScreenId || screenId, effectiveParentScreenId, planMode, enabledFeatures.length > 0 ? enabledFeatures : undefined, imageUrls, modelId, effectivePlanId);
+        }
+
+        // Safety timeout: if chat:complete/chat:error never arrives, auto-recover
+        // Multi-file app updates can legitimately take several minutes.
+        if (chatTimeoutRef.current) clearTimeout(chatTimeoutRef.current);
+        const timeoutMs = useMultiFileModify ? 300_000 : 180_000;
+        chatTimeoutRef.current = setTimeout(() => {
+          chatTimeoutRef.current = null;
+          const stuckMessageId = assistantMessageIdRef.current;
+          if (!stuckMessageId) return;
+
+          setLocalMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === stuckMessageId
+                ? { ...msg, content: msg.content || "Response may have completed — refreshing...", isStreaming: false }
+                : msg,
+            ),
+          );
+          setStreaming(false);
+          failTurn("Response timed out before the final event arrived.", true);
+          onGenerationEnd?.();
+          chatQueryClient.invalidateQueries({ queryKey: ["chatHistory", projectId] });
+          chatQueryClient.invalidateQueries({ queryKey: ["screens", projectId] });
+          // Don't clear assistantMessageIdRef — let chat:complete still update the message if it arrives late
+          addedSkeletonNameRef.current = null;
+        }, timeoutMs);
+
         return;
       }
 
@@ -827,14 +1240,49 @@ export function ChatSidebar({
           pendingRecommendations,
           changedFiles,
         ) => {
+          // Snapshot current action logs to persist with this message
+          const completedActionLogs = actionLogs && actionLogs.length > 0 ? [...actionLogs] : undefined;
+
+          // Persist action logs to localStorage for reload survival
+          const finalMessageId = messageId || assistantMessageId;
+          if (completedActionLogs && projectId) {
+            try {
+              const storageKey = `actionLogs:${projectId}`;
+              const existing = JSON.parse(localStorage.getItem(storageKey) || '{}');
+              existing[finalMessageId] = completedActionLogs;
+              // Keep only the last 20 messages' logs to limit storage
+              const keys = Object.keys(existing);
+              if (keys.length > 20) {
+                for (const k of keys.slice(0, keys.length - 20)) delete existing[k];
+              }
+              localStorage.setItem(storageKey, JSON.stringify(existing));
+            } catch { /* ignore storage errors */ }
+          }
+
           setLocalMessages((prev) => {
+            const changedFileArtifacts = changedFiles?.map((file) => ({
+              path: file.path,
+              action: "modified" as const,
+            }));
             let newMessages = prev.map((msg) =>
               msg.id === assistantMessageId
                 ? {
                     ...msg,
-                    id: messageId || assistantMessageId,
+                    id: finalMessageId,
                     content: fullContent,
                     isStreaming: false,
+                    metadata: changedFileArtifacts?.length
+                      ? {
+                          ...(msg.metadata || {}),
+                          type: "artifact" as const,
+                          summary: `Updated ${changedFileArtifacts.length} file${changedFileArtifacts.length === 1 ? "" : "s"} from this request.`,
+                          files: changedFileArtifacts,
+                          ...(completedActionLogs ? { actionLogs: completedActionLogs } : {}),
+                        }
+                      : {
+                          ...(msg.metadata || {}),
+                          ...(completedActionLogs ? { actionLogs: completedActionLogs } : {}),
+                        },
                   }
                 : msg,
             );
@@ -890,11 +1338,20 @@ export function ChatSidebar({
 
             return newMessages;
           });
-          setIsStreaming(false);
+          setStreaming(false);
+          if (planMode && !screen) {
+            setAwaitingPlan();
+          } else {
+            completeTurn();
+          }
           onGenerationEnd?.();
           chatQueryClient.invalidateQueries({
             queryKey: ["chatHistory", projectId],
           });
+
+          // Auto-focus input after AI response completes
+          setTimeout(() => inputRef.current?.focus(), 150);
+          scrollToBottom();
 
           // Handle source files changed (for Code Studio integration)
           if (changedFiles && changedFiles.length > 0) {
@@ -930,7 +1387,8 @@ export function ChatSidebar({
                 : msg,
             ),
           );
-          setIsStreaming(false);
+          setStreaming(false);
+          failTurn(error, true);
           onGenerationEnd?.();
           if (effectiveScreenId) {
             onSetScreenLoading?.(effectiveScreenId, false);
@@ -962,7 +1420,8 @@ export function ChatSidebar({
                 : msg,
             ),
           );
-          setIsStreaming(false);
+          setStreaming(false);
+          failTurn("Connection lost before the turn completed.", true);
           onGenerationEnd?.();
           if (effectiveScreenId) {
             onSetScreenLoading?.(effectiveScreenId, false);
@@ -1029,11 +1488,9 @@ export function ChatSidebar({
       planMode,
       localMessages,
       screens,
-      startMultiFileGeneration,
-      modifyMultiFile,
       multiFileState,
-      detectMultiAppIntent,
-      parseScreensFromDescription,
+      enabledFeatures,
+      modifyMultiFile,
     ],
   );
 
@@ -1076,8 +1533,8 @@ export function ChatSidebar({
     }
     setPendingImages([]);
 
-    sendMessage(message, undefined, undefined, imageUrls.length > 0 ? imageUrls : undefined);
-  }, [input, sendMessage, pendingImages]);
+    sendMessage(message, undefined, chatScreenId, imageUrls.length > 0 ? imageUrls : undefined);
+  }, [input, sendMessage, pendingImages, chatScreenId]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1120,6 +1577,27 @@ export function ChatSidebar({
         });
     }
   }, []);
+
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const imageFiles: File[] = [];
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) imageFiles.push(file);
+        }
+      }
+      if (imageFiles.length > 0) {
+        e.preventDefault();
+        const dt = new DataTransfer();
+        imageFiles.forEach((f) => dt.items.add(f));
+        handleImageSelect(dt.files);
+      }
+    },
+    [handleImageSelect],
+  );
 
   const removeImage = useCallback((imageId: string) => {
     setPendingImages((prev) => {
@@ -1222,87 +1700,246 @@ export function ChatSidebar({
             />
           )}
 
-
           <div
             ref={scrollRef}
-            className="flex-1 h-0 min-h-0 overflow-y-auto px-3 py-3 space-y-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-surface-700 hover:scrollbar-thumb-surface-600"
+            className="flex-1 h-0 min-h-0 overflow-y-auto px-3 py-4 space-y-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-surface-700 hover:scrollbar-thumb-surface-600"
           >
-            {isLoadingHistory ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-5 h-5 animate-spin text-surface-500" />
+            {(isLoadingHistory || (!historyInitialized && !isHistoryError && localMessages.length === 0)) ? (
+              <div className="space-y-4 py-4 animate-pulse">
+                {/* Skeleton: assistant message */}
+                <div className="flex gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-surface-800 flex-shrink-0" />
+                  <div className="space-y-2 flex-1 max-w-[75%]">
+                    <div className="h-3 bg-surface-800 rounded-full w-full" />
+                    <div className="h-3 bg-surface-800 rounded-full w-4/5" />
+                    <div className="h-3 bg-surface-800 rounded-full w-3/5" />
+                  </div>
+                </div>
+                {/* Skeleton: user message */}
+                <div className="flex gap-2 flex-row-reverse">
+                  <div className="w-7 h-7 rounded-lg bg-primary-500/20 flex-shrink-0" />
+                  <div className="space-y-2 max-w-[65%]">
+                    <div className="h-3 bg-surface-800 rounded-full w-full" />
+                    <div className="h-3 bg-surface-800 rounded-full w-3/4" />
+                  </div>
+                </div>
+                {/* Skeleton: assistant message */}
+                <div className="flex gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-surface-800 flex-shrink-0" />
+                  <div className="space-y-2 flex-1 max-w-[70%]">
+                    <div className="h-3 bg-surface-800 rounded-full w-full" />
+                    <div className="h-3 bg-surface-800 rounded-full w-5/6" />
+                  </div>
+                </div>
+                {/* Skeleton: user message */}
+                <div className="flex gap-2 flex-row-reverse">
+                  <div className="w-7 h-7 rounded-lg bg-primary-500/20 flex-shrink-0" />
+                  <div className="space-y-2 max-w-[60%]">
+                    <div className="h-3 bg-surface-800 rounded-full w-full" />
+                  </div>
+                </div>
               </div>
             ) : localMessages.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500/20 to-primary-600/10 border border-primary-500/20 flex items-center justify-center mb-4">
-                  <MessageSquare className="w-5 h-5 text-primary-400" />
+              <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500/20 to-cyan-500/10 flex items-center justify-center mb-4 border border-primary-500/20">
+                  <Sparkles className="w-7 h-7 text-primary-400" />
                 </div>
-                <h3 className="text-sm font-semibold text-white mb-1.5">
-                  Start a conversation
+                <h3 className="text-lg font-semibold text-surface-200 mb-1.5">
+                  What would you like to build?
                 </h3>
-                <p className="text-xs text-surface-400 text-center max-w-[200px] leading-relaxed mb-4">
-                  Describe screens or ask for modifications to your designs.
+                <p className="text-sm text-surface-500 mb-5">
+                  Describe your app and I'll generate the screens for you.
                 </p>
-                <div className="flex flex-col gap-2 w-full max-w-[200px]">
-                  <button
-                    onClick={() => { setInput("Create a "); inputRef.current?.focus(); }}
-                    className="px-3 py-2 bg-surface-800/50 hover:bg-surface-800 border border-surface-700/50 rounded-lg text-xs text-surface-300 hover:text-white transition-colors text-left"
-                  >
-                    + Create a new screen
-                  </button>
-                  <button
-                    onClick={() => { setInput("Edit the "); inputRef.current?.focus(); }}
-                    className="px-3 py-2 bg-surface-800/50 hover:bg-surface-800 border border-surface-700/50 rounded-lg text-xs text-surface-300 hover:text-white transition-colors text-left"
-                  >
-                    Modify a screen
-                  </button>
+                <div className="flex flex-col gap-2.5 w-full">
+                  {([
+                    { text: 'A fitness tracking app', desc: 'Track workouts, set goals, view progress', icon: Dumbbell },
+                    { text: 'A recipe sharing app', desc: 'Browse recipes, save favorites, share with friends', icon: ChefHat },
+                    { text: 'A task manager with teams', desc: 'Organize tasks, assign to members, track deadlines', icon: Users },
+                  ] as const).map(({ text, desc, icon: Icon }) => (
+                    <button
+                      key={text}
+                      onClick={() => { setInput(text); inputRef.current?.focus(); }}
+                      className="group text-left px-4 py-3 rounded-xl bg-surface-800/40 border border-surface-700/50
+                                 hover:bg-surface-800/70 hover:border-surface-600/60 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20
+                                 transition-all duration-200"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-primary-500/10 border border-primary-500/20 flex items-center justify-center flex-shrink-0 mt-0.5
+                                        group-hover:bg-primary-500/20 transition-colors">
+                          <Icon className="w-4 h-4 text-primary-400" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-surface-300 group-hover:text-white transition-colors">
+                            {text}
+                          </p>
+                          <p className="text-xs text-surface-500 mt-0.5 leading-relaxed">
+                            {desc}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </div>
             ) : (
-              localMessages.map((message) => (
-                <ChatMessageBubble
-                  key={message.id}
-                  message={message}
-                  onScreenClick={onViewScreen}
-                  progressMessages={progressMessages}
-                  onGenerateRecommended={onGenerateRecommended}
-                  onDismissRecommendations={onDismissRecommendations}
-                  streamingStatus={
-                    message.isStreaming ? streamingStatus : undefined
-                  }
-                  screens={screens}
-                  onViewScreen={onViewScreen}
-                />
+              localMessages.filter((msg, idx, arr) => arr.findIndex((m) => m.id === msg.id) === idx).map((message, index) => (
+                  <ChatMessageBubble
+                    key={message.id}
+                    message={message}
+                    onScreenClick={onViewScreen}
+                    progressMessages={progressMessages}
+                    onGenerateRecommended={onGenerateRecommended}
+                    onDismissRecommendations={onDismissRecommendations}
+                    streamingStatus={
+                      message.isStreaming ? streamingStatus : undefined
+                    }
+                    screens={screens}
+                    onViewScreen={onViewScreen}
+                    onRetry={message.error ? (() => {
+                      // Find the preceding user message to re-send
+                      const userMsg = localMessages.slice(0, index).reverse().find(m => m.role === 'user');
+                      if (!userMsg || !socketSendMessage) return;
+
+                      // Replace the failed assistant message with a fresh streaming placeholder
+                      const retryAssistantId = `assistant-retry-${Date.now()}`;
+                      assistantMessageIdRef.current = retryAssistantId;
+                      setLocalMessages(prev => prev.map(m =>
+                        m.id === message.id
+                          ? { ...m, id: retryAssistantId, content: '', isStreaming: true, error: false }
+                          : m
+                      ));
+                      setStreaming(true);
+                      setStreamingStatus('Retrying...');
+                      startTurn(planModeRef.current ? 'Plan' : 'Direct');
+                      setGenerationStatus(prev => ({ ...prev, isGenerating: true }));
+                      onGenerationStart?.();
+
+                      // Re-send with original parameters from the user message metadata
+                      const modelId = useModelStore.getState().getEffectiveModelId() || undefined;
+                      const imgUrls = userMsg.metadata?.imageUrls as string[] | undefined;
+                      const retryPlanId = planModeRef.current ? (useChatStore.getState().activePlanId || undefined) : undefined;
+                      socketSendMessage(userMsg.content, screenId, parentScreenId, planModeRef.current, enabledFeatures.length > 0 ? enabledFeatures : undefined, imgUrls, modelId, retryPlanId);
+                    }) : undefined}
+                    liveActionLogs={message.isStreaming ? actionLogs : undefined}
+                    isPlanImplementing={isPlanImplementing}
+                    onRefinePlan={socketSendMessage ? (planId: string, feedback: string) => {
+                      // Send refinement as a plan-mode message with the planId
+                      const refinementAssistantId = `assistant-refine-${Date.now()}`;
+                      const refinementUserId = `user-refine-${Date.now()}`;
+                      assistantMessageIdRef.current = refinementAssistantId;
+                      processedMessageIdsRef.current.add(refinementAssistantId);
+                      processedMessageIdsRef.current.add(refinementUserId);
+
+                      setLocalMessages((prev) => [
+                        ...prev,
+                        {
+                          id: refinementUserId,
+                          role: "user",
+                          content: feedback,
+                          metadata: { executionMode: "Plan" },
+                        },
+                        {
+                          id: refinementAssistantId,
+                          role: "assistant",
+                          content: "",
+                          isStreaming: true,
+                        },
+                      ]);
+                      setStreaming(true);
+                      setStreamingStatus("Refining plan...");
+                      planModeRef.current = true;
+                      startTurn("Plan");
+
+                      const modelId = useModelStore.getState().getEffectiveModelId() || undefined;
+                      socketSendMessage(feedback, screenId, parentScreenId, true, undefined, undefined, modelId, planId);
+                    } : undefined}
+                    onConfirmPlan={socketSendMessage ? (planContent: string) => {
+                      // Find the original user message that triggered this plan
+                      const userMsg = localMessages.slice(0, index).reverse().find(m => m.role === 'user');
+                      if (!userMsg) return;
+
+                      // Mark this plan message as implemented so the button disappears
+                      setLocalMessages((prev) =>
+                        prev.map((m) =>
+                          m.id === message.id
+                            ? { ...m, metadata: { ...m.metadata, planImplemented: true } }
+                            : m,
+                        ),
+                      );
+
+                      setIsPlanImplementing(true);
+                      clearActivePlan();
+
+                      // Create a new assistant placeholder for the implementation
+                      const implAssistantId = `assistant-impl-${Date.now()}`;
+                      assistantMessageIdRef.current = implAssistantId;
+                      processedMessageIdsRef.current.add(implAssistantId);
+
+                      setLocalMessages((prev) => [
+                        ...prev,
+                        {
+                          id: implAssistantId,
+                          role: "assistant",
+                          content: "",
+                          isStreaming: true,
+                        },
+                      ]);
+                      setStreaming(true);
+                      setStreamingStatus("Implementing plan...");
+                      // Temporarily switch to Direct mode so the response is tagged correctly
+                      planModeRef.current = false;
+                      startTurn("Direct");
+                      setGenerationStatus((prev) => ({ ...prev, isGenerating: true }));
+                      // Do NOT call onGenerationStart or onSetScreenLoading here —
+                      // keep the existing preview visible until actual code arrives.
+                      // The screen:complete handler will update the preview naturally.
+
+                      const effectiveScreenId = chatScreenId || screenId;
+                      effectiveScreenIdRef.current = effectiveScreenId;
+
+                      // Re-send the original user message in direct mode with the plan as context
+                      const implementMessage = `Implement this plan:\n\n${planContent}\n\nOriginal request: ${userMsg.content}`;
+                      const modelId = useModelStore.getState().getEffectiveModelId() || undefined;
+                      socketSendMessage(implementMessage, effectiveScreenId, parentScreenId, false, enabledFeatures.length > 0 ? enabledFeatures : undefined, undefined, modelId);
+                    } : undefined}
+                    onEditMessage={(messageId, newContent) => {
+                      // Update the message text and remove all subsequent messages
+                      setLocalMessages((prev) => {
+                        const msgIndex = prev.findIndex((m) => m.id === messageId);
+                        if (msgIndex === -1) return prev;
+                        const updated = [...prev.slice(0, msgIndex), { ...prev[msgIndex], content: newContent }];
+                        return updated;
+                      });
+                      // Re-send the edited message
+                      if (socketSendMessage) {
+                        socketSendMessage(newContent);
+                      }
+                    }}
+                  />
               ))
             )}
+
+            {/* Scroll anchor */}
+            <div ref={scrollAnchorRef} className="h-0 w-0" />
           </div>
 
-          {/* Generation Status Card - above input */}
-          <GenerationStatusCard
-            activeProgress={activeProgress}
-            generationStatus={generationStatus}
-            onGenerateRecommended={(screenIds) => {
-              setGenerationStatus((prev) => ({
-                ...prev,
-                pendingRecommendations: null,
-              }));
-              // Also remove recommendation messages from chat history
-              setLocalMessages((prev) =>
-                prev.filter((m) => m.metadata?.type !== "screen_suggestion"),
-              );
-              onGenerateRecommended?.(screenIds);
-            }}
-            onDismissRecommendations={(screenIds) => {
-              setGenerationStatus((prev) => ({
-                ...prev,
-                pendingRecommendations: null,
-              }));
-              // Also remove recommendation messages from chat history
-              setLocalMessages((prev) =>
-                prev.filter((m) => m.metadata?.type !== "screen_suggestion"),
-              );
-              onDismissRecommendations?.(screenIds);
-            }}
-          />
+          {/* Scroll-to-bottom pill */}
+          {isScrolledAway && localMessages.length > 0 && (
+            <div className="flex justify-center -mt-8 mb-1 relative z-20">
+              <button
+                onClick={scrollToBottom}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full
+                           bg-surface-800/90 border border-surface-700/60 text-xs text-surface-300
+                           hover:bg-surface-700 hover:text-white shadow-lg shadow-black/30
+                           transition-all duration-200 backdrop-blur-sm"
+              >
+                <ArrowDown className="w-3 h-3" />
+                New messages
+              </button>
+            </div>
+          )}
+
+          {/* Generation Status Card removed — duplicate of planned_screens card in chat */}
 
           {/* Screen Recommendations Widget - shows pending recommendations */}
           {generationStatus.pendingRecommendations && (
@@ -1329,61 +1966,7 @@ export function ChatSidebar({
             </div>
           )}
 
-          {/* Compact generation status indicator */}
-          {isActiveGeneration && (() => {
-            const total = screens?.filter(s => !s.parentScreenId).length ?? 0;
-            const loading = screens?.filter(s => s.isLoading).length ?? 0;
-            const done = total - loading;
-            const indicatorPct = total > 0 ? (done / total) * 100 : 0;
-            const allScreensDone = total > 0 && done === total && hasGeneratingScreens === false;
-
-            return (
-              <div className="px-3 py-2 border-t border-surface-800/50">
-                <div className={cn(
-                  "px-2 py-1.5 rounded-lg bg-surface-800/60 border transition-colors",
-                  allScreensDone
-                    ? "border-green-500/30"
-                    : hasGeneratingScreens
-                      ? "border-primary-500/30 animate-pulse"
-                      : "border-surface-700/40"
-                )}>
-                  <div className="flex items-center gap-2">
-                    {allScreensDone ? (
-                      <Check className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
-                    ) : (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-primary-400 flex-shrink-0" />
-                    )}
-                    <span className={cn(
-                      "text-xs truncate",
-                      allScreensDone ? "text-green-400" : "text-surface-300"
-                    )}>
-                      {allScreensDone
-                        ? 'All screens generated'
-                        : hasGeneratingScreens
-                          ? `Generating ${done}/${total} screens...`
-                          : pendingPlannedScreens
-                            ? 'Starting generation...'
-                            : streamingStatus || 'Planning screens...'}
-                    </span>
-                  </div>
-                  {/* Thin progress bar */}
-                  {total > 0 && (
-                    <div className="mt-1.5 h-1 bg-surface-700/50 rounded-full overflow-hidden">
-                      <motion.div
-                        className={cn(
-                          "h-full rounded-full",
-                          allScreensDone ? "bg-green-500" : "bg-primary-500"
-                        )}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${indicatorPct}%` }}
-                        transition={{ duration: 0.4, ease: "easeOut" }}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
+          {/* Compact generation status indicator removed — used stale canvas data, duplicated planning card */}
 
           <div className="px-3 py-3 border-t border-surface-800/50">
             {/* Pending image thumbnails */}
@@ -1413,13 +1996,189 @@ export function ChatSidebar({
               </div>
             )}
 
-            {/* Plan mode toggle */}
-            {!screenId && !selectedElement && (
-              <div className="flex items-center gap-1.5 mb-2">
+            {/* Plan refinement hint */}
+            {turnState.status === "awaiting-user-plan" && activePlanId && (
+              <div className="text-[10px] text-surface-500 mb-1 px-1">
+                Type feedback to refine the plan, or click "Implement Plan" above
+              </div>
+            )}
+
+            {/* Consolidated progress indicator */}
+            <ChatProgressIndicator
+              isStreaming={isStreaming}
+              statusMessage={streamingStatus}
+              multiFileState={multiFileState}
+              actionLogs={actionLogs}
+              turnStatus={turnState.status}
+              turnError={turnState.lastError || undefined}
+            />
+
+            {/* Active feature pills */}
+            {enabledFeatures.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-2">
+                {enabledFeatures.map(featureId => {
+                  const feature = featureCatalog?.find(f => f.id === featureId);
+                  return feature ? (
+                    <span
+                      key={featureId}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 text-[10px]"
+                    >
+                      {feature.name}
+                      <button
+                        onClick={() => {
+                          if (onFeaturesChange) {
+                            onFeaturesChange(enabledFeatures.filter(f => f !== featureId));
+                          }
+                        }}
+                        className="hover:text-blue-300"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </span>
+                  ) : null;
+                })}
+              </div>
+            )}
+
+            {/* Feature picker popover */}
+            <div className="relative">
+              <FeaturePicker
+                projectId={projectId}
+                enabledFeatures={enabledFeatures}
+                onToggleFeature={(featureId) => {
+                  if (onFeaturesChange) {
+                    const newFeatures = enabledFeatures.includes(featureId)
+                      ? enabledFeatures.filter(f => f !== featureId)
+                      : [...enabledFeatures, featureId];
+                    onFeaturesChange(newFeatures);
+                  }
+                }}
+                isOpen={showFeaturePicker}
+                onClose={() => setShowFeaturePicker(false)}
+              />
+            </div>
+
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files) handleImageSelect(e.target.files);
+                e.target.value = "";
+              }}
+            />
+
+            {/* Unified input box */}
+            <div className="rounded-xl bg-surface-800/50 border border-surface-700/50 focus-within:border-primary-500/50 transition-colors">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  const target = e.target;
+                  target.style.height = "auto";
+                  target.style.height = `${Math.min(target.scrollHeight, 150)}px`;
+                }}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+                placeholder={
+                  editSuggestion
+                    ? "Describe your changes..."
+                    : isStreaming
+                      ? "Waiting..."
+                      : selectedElement
+                        ? `Describe changes to this ${selectedElement.elementType}...`
+                        : selectedScreen
+                          ? `Describe changes to "${selectedScreen.name}"...`
+                          : screenName
+                            ? `Edit "${screenName}" or create new screen...`
+                            : "Describe the mobile app you want to build..."
+                }
+                disabled={isStreaming}
+                rows={2}
+                className={cn(
+                  "w-full resize-none bg-transparent text-sm text-white placeholder-surface-500 focus:outline-none pt-3 pb-1 px-3.5 max-h-[150px]",
+                  isStreaming && "cursor-not-allowed opacity-50",
+                )}
+              />
+
+              {/* Bottom toolbar — single row */}
+              <div className="flex items-center gap-1 px-1.5 pb-1.5">
+                {/* Attach */}
                 <button
-                  onClick={() => setPlanMode(true)}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isStreaming}
                   className={cn(
-                    "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all",
+                    "flex-shrink-0 p-1.5 rounded-lg text-surface-400 hover:text-white hover:bg-surface-700/50 transition-colors",
+                    isStreaming && "cursor-not-allowed opacity-50",
+                  )}
+                  title="Attach images"
+                >
+                  <Paperclip className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Compact screen selector */}
+                {screens && screens.length > 0 && (
+                  <div ref={screenDropdownRef} className="relative">
+                    {chatScreenId && selectedScreen ? (
+                      <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary-500/10 border border-primary-500/25">
+                        <Smartphone className="w-3 h-3 text-primary-400 flex-shrink-0" />
+                        <span className="text-[11px] text-primary-300 font-medium truncate max-w-[80px]">
+                          {selectedScreen.name}
+                        </span>
+                        <button
+                          onClick={() => setChatScreenId(undefined)}
+                          className="p-0.5 rounded text-surface-400 hover:text-white transition-colors flex-shrink-0"
+                          title="Clear screen selection"
+                        >
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setScreenDropdownOpen(!screenDropdownOpen)}
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-surface-400 hover:text-surface-300 hover:bg-surface-700/50 transition-colors"
+                      >
+                        <Smartphone className="w-3 h-3 flex-shrink-0" />
+                        <span>Screen</span>
+                        <ChevronDown className={cn("w-2.5 h-2.5 transition-transform", screenDropdownOpen && "rotate-180")} />
+                      </button>
+                    )}
+
+                    {screenDropdownOpen && (
+                      <div className="absolute bottom-full left-0 mb-1 w-48 max-h-48 overflow-y-auto bg-surface-900 border border-surface-700 rounded-lg shadow-xl z-50 py-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-surface-700">
+                        {screens.map((s) => (
+                          <button
+                            key={s.id}
+                            onClick={() => {
+                              setChatScreenId(s.id);
+                              setScreenDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-3 py-2 hover:bg-surface-800 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Smartphone className="w-3.5 h-3.5 text-surface-400 flex-shrink-0" />
+                              <span className="text-sm font-medium text-white truncate">{s.name}</span>
+                              <span className="ml-auto text-[10px] text-surface-500 flex-shrink-0">{s.type}</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Model selector */}
+                <ModelSelector />
+
+                {/* Plan toggle */}
+                <button
+                  onClick={() => setPlanMode(!planMode)}
+                  className={cn(
+                    "flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium transition-all",
                     planMode
                       ? "bg-primary-500/15 text-primary-300 border border-primary-500/30"
                       : "text-surface-500 hover:text-surface-300 border border-transparent hover:border-surface-700/50"
@@ -1428,89 +2187,27 @@ export function ChatSidebar({
                   <ListChecks className="w-3 h-3" />
                   Plan
                 </button>
-                <button
-                  onClick={() => setPlanMode(false)}
-                  className={cn(
-                    "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all",
-                    !planMode
-                      ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
-                      : "text-surface-500 hover:text-surface-300 border border-transparent hover:border-surface-700/50"
-                  )}
-                >
-                  <Zap className="w-3 h-3" />
-                  Direct
-                </button>
-              </div>
-            )}
 
-            <div className="relative flex items-end gap-2 p-2 rounded-xl bg-surface-800/50 border border-surface-700/50 focus-within:border-primary-500/50 transition-colors">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files) handleImageSelect(e.target.files);
-                  e.target.value = "";
-                }}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isStreaming}
-                className={cn(
-                  "flex-shrink-0 p-2 rounded-lg text-surface-400 hover:text-white hover:bg-surface-700/50 transition-colors",
-                  isStreaming && "cursor-not-allowed opacity-50",
-                )}
-                title="Attach images"
-              >
-                <Paperclip className="w-3.5 h-3.5" />
-              </button>
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => {
-                  setInput(e.target.value);
-                  // Auto-resize textarea
-                  const target = e.target;
-                  target.style.height = "auto";
-                  target.style.height = `${Math.min(target.scrollHeight, 150)}px`;
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder={
-                  editSuggestion
-                    ? "Describe your changes..."
-                    : isStreaming
-                      ? "Waiting..."
-                      : selectedElement
-                        ? `Describe changes to this ${selectedElement.elementType}...`
-                        : screenName
-                          ? `Edit "${screenName}" or create new screen...`
-                          : "Describe a screen to create or select one to edit..."
-                }
-                disabled={isStreaming}
-                rows={2}
-                className={cn(
-                  "flex-1 resize-none bg-transparent text-sm text-white placeholder-surface-500 focus:outline-none py-2 px-2 max-h-[150px]",
-                  isStreaming && "cursor-not-allowed opacity-50",
-                )}
-              />
-              <button
-                onClick={handleSendMessage}
-                disabled={isStreaming || !input.trim()}
-                className={cn(
-                  "flex-shrink-0 p-2 rounded-lg transition-all",
-                  isStreaming || !input.trim()
-                    ? "bg-surface-700/50 text-surface-500 cursor-not-allowed"
-                    : "bg-primary-500 text-white hover:bg-primary-400 shadow-lg shadow-primary-500/20",
-                )}
-              >
-                {isStreaming ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Send className="w-3.5 h-3.5" />
-                )}
-              </button>
+                {/* Send — right-aligned */}
+                <div className="ml-auto">
+                  <button
+                    onClick={handleSendMessage}
+                    disabled={isStreaming || !input.trim()}
+                    className={cn(
+                      "p-1.5 rounded-lg transition-all",
+                      isStreaming || !input.trim()
+                        ? "text-surface-500 cursor-not-allowed"
+                        : "bg-primary-500 text-white hover:bg-primary-400 shadow-lg shadow-primary-500/20",
+                    )}
+                  >
+                    {isStreaming ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </>

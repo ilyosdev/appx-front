@@ -58,8 +58,14 @@ export function useCollaboration(
     try {
       const res = await api.get(`/projects/${projectId}/access-level`);
       store.setMyAccessLevel(res.data.accessLevel);
-    } catch {
-      store.setMyAccessLevel("none");
+    } catch (err: any) {
+      // Only set "none" for explicit 403/404 (permission denied / not found)
+      // Network errors or 401 (token expired, will be refreshed) should not show "No Access"
+      const status = err?.response?.status;
+      if (status === 403 || status === 404) {
+        store.setMyAccessLevel("none");
+      }
+      // Otherwise keep current value (initial "none" or previously fetched)
     }
   }, [projectId, store]);
 
