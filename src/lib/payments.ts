@@ -5,7 +5,7 @@ interface ApiResponse<T> {
   data: T;
 }
 
-export type PlanType = 'free' | 'starter' | 'pro' | 'business';
+export type PlanType = 'free' | 'pro' | 'business';
 
 export interface SubscriptionDto {
   id: string | null;
@@ -72,9 +72,10 @@ export const PLAN_FEATURES = {
   free: {
     name: 'Free',
     price: 0,
-    credits: 5,
+    credits: 10,
     screens: 5,
     projects: 1,
+    containers: 1,
     codeExports: 0,
     figmaExports: 0,
     support: 'Community',
@@ -82,45 +83,64 @@ export const PLAN_FEATURES = {
     githubConnect: false,
     codeExport: false,
     dailyGenerationLimit: 5,
+    customSubdomain: false,
+    customDomain: false,
+    alwaysOn: false,
   },
+  // Keep starter in features map for backward-compat with any existing user data
   starter: {
     name: 'Starter',
     price: 25,
     credits: 100,
     screens: 50,
     projects: 3,
+    containers: 3,
     codeExports: Infinity,
     figmaExports: 0,
     support: 'Email',
     canPurchaseCredits: true,
     githubConnect: false,
     codeExport: true,
+    dailyGenerationLimit: Infinity,
+    customSubdomain: true,
+    customDomain: false,
+    alwaysOn: false,
   },
   pro: {
     name: 'Pro',
-    price: 50,
-    credits: 250,
+    price: 20,
+    credits: 100,
     screens: Infinity,
-    projects: 10,
+    projects: 3,
+    containers: 3,
     codeExports: Infinity,
     figmaExports: 0,
     support: 'Priority',
     canPurchaseCredits: true,
     githubConnect: true,
     codeExport: true,
+    dailyGenerationLimit: Infinity,
+    customSubdomain: true,
+    customDomain: true,
+    alwaysOn: true,
   },
   business: {
     name: 'Business',
     price: 100,
     credits: 500,
     screens: Infinity,
-    projects: Infinity,
+    projects: 10,
+    containers: 10,
     codeExports: Infinity,
     figmaExports: Infinity,
     support: 'Dedicated',
     canPurchaseCredits: true,
     githubConnect: true,
     codeExport: true,
+    dailyGenerationLimit: Infinity,
+    customSubdomain: true,
+    customDomain: true,
+    alwaysOn: true,
   },
 };
 
@@ -151,8 +171,8 @@ export const paymentsApi = {
   getCreditPacks: () =>
     api.get<ApiResponse<CreditPackDto[]>>('/payments/credit-packs'),
 
-  createCheckout: (plan: 'starter' | 'pro' | 'business', successUrl?: string) =>
-    api.post<ApiResponse<CheckoutUrlData>>('/payments/create-checkout', { plan, successUrl }),
+  createCheckout: (plan: 'starter' | 'pro' | 'business', successUrl?: string, billing?: 'monthly' | 'annual') =>
+    api.post<ApiResponse<CheckoutUrlData>>('/payments/create-checkout', { plan, successUrl, billing }),
 
   createPortalSession: () =>
     api.post<ApiResponse<CheckoutUrlData>>('/payments/create-portal'),

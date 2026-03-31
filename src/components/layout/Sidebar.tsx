@@ -2,7 +2,7 @@ import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useEffect } from 'react';
 import { LayoutDashboard, User, Bell, CreditCard, Send, Crown, Check } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { LogoIcon } from '../ui';
+
 import { useAuthStore } from '../../stores/authStore';
 import { useCollaborationStore } from '../../stores/collaborationStore';
 import { TeamSwitcher } from '../collaboration/TeamSwitcher';
@@ -72,11 +72,13 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="hidden lg:flex flex-col w-64 border-r border-surface-800 bg-surface-900/50 sticky top-0 h-screen">
-      <div className="h-16 flex items-center px-6 border-b border-surface-800">
-        <Link to="/" className="flex items-center gap-2">
-          <LogoIcon className="w-8 h-8" />
-          <span className="font-bold text-lg text-white">AppX</span>
+    <aside className="hidden lg:flex flex-col w-64 border-r border-white/[0.06] bg-black/60 backdrop-blur-xl sticky top-0 h-screen">
+      <div className="h-16 flex items-center px-6 border-b border-white/[0.06]">
+        <Link to="/" className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-white/[0.06] border border-white/[0.1] flex items-center justify-center p-1.5">
+            <img src="/logo.png" alt="AppX" className="w-full h-full invert" />
+          </div>
+          <span className="font-semibold text-[15px] text-white tracking-tight">AppX</span>
         </Link>
       </div>
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { projectsApi, type EnvVarResponse } from '@/lib/projects';
-import { Lock, Unlock, Trash2, Plus, Info, Loader2 } from 'lucide-react';
+import { Lock, Unlock, Trash2, Plus, Info, Loader2, Scan, Upload, AlertTriangle, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui';
 
@@ -19,10 +19,17 @@ export function EnvVarsPanel({ projectId }: EnvVarsPanelProps) {
   const [newIsSecret, setNewIsSecret] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showDetected, setShowDetected] = useState(false);
 
   const { data: envVars = [], isLoading } = useQuery<EnvVarResponse[]>({
     queryKey: ['env-vars', projectId],
     queryFn: () => projectsApi.getEnvVars(projectId),
+  });
+
+  const { data: detected, isLoading: isDetecting, refetch: runDetect } = useQuery({
+    queryKey: ['env-vars-detect', projectId],
+    queryFn: () => projectsApi.detectEnvVars(projectId),
+    enabled: showDetected,
   });
 
   const createMutation = useMutation({
@@ -62,8 +69,21 @@ export function EnvVarsPanel({ projectId }: EnvVarsPanelProps) {
     },
   });
 
+  const pushMutation = useMutation({
+    mutationFn: () => projectsApi.pushEnvVars(projectId),
+    onSuccess: (data) => {
+      toast({ title: `Pushed ${data.pushed} variables to container`, variant: 'success' });
+    },
+    onError: (err: any) => {
+      toast({
+        title: 'Failed to push variables',
+        description: err.response?.data?.message || 'No running container',
+        variant: 'error',
+      });
+    },
+  });
+
   const handleKeyInput = (value: string) => {
-    // Auto-uppercase, allow only A-Z, 0-9, underscore
     const sanitized = value.toUpperCase().replace(/[^A-Z0-9_]/g, '');
     setNewKey(sanitized);
   };
@@ -75,24 +95,109 @@ export function EnvVarsPanel({ projectId }: EnvVarsPanelProps) {
 
   const handleDelete = (varId: string) => {
     if (deletingId === varId) {
-      // Second click = confirm
       deleteMutation.mutate(varId);
     } else {
       setDeletingId(varId);
-      // Auto-reset after 3 seconds if not confirmed
       setTimeout(() => setDeletingId((prev) => (prev === varId ? null : prev)), 3000);
     }
   };
 
+  const handleAddDetected = (key: string) => {
+    setNewKey(key);
+    setNewValue('');
+    setNewIsSecret(true);
+    setShowAddForm(true);
+    setShowDetected(false);
+  };
+
+  const unconfiguredDetected = detected?.detected.filter(d => !d.configured) || [];
+  const suggestions = detected?.suggestions || [];
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs text-surface-500">
-            Encrypted at rest with AES-256-GCM
-          </p>
+        <p className="text-xs text-surface-500">
+          Encrypted at rest with AES-256-GCM
+        </p>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => { setShowDetected(!showDetected); if (!showDetected) runDetect(); }}
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-surface-400 hover:text-white hover:bg-surface-800 transition-colors"
+            title="Scan code for env vars"
+          >
+            <Scan className="w-3 h-3" />
+            Detect
+          </button>
+          {envVars.length > 0 && (
+            <button
+              onClick={() => pushMutation.mutate()}
+              disabled={pushMutation.isPending}
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-primary-400 hover:text-white hover:bg-primary-500/20 transition-colors disabled:opacity-50"
+              title="Push env vars to running container"
+            >
+              {pushMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+              Push
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Detected env vars from code */}
+      {showDetected && (
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 space-y-2">
+          <p className="text-xs font-medium text-amber-300 flex items-center gap-1.5">
+            <Scan className="w-3.5 h-3.5" />
+            Detected from code
+          </p>
+          {isDetecting ? (
+            <div className="flex items-center gap-2 py-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-surface-400" />
+              <span className="text-xs text-surface-400">Scanning source files...</span>
+            </div>
+          ) : unconfiguredDetected.length === 0 && suggestions.length === 0 ? (
+            <p className="text-xs text-surface-500">All detected variables are configured.</p>
+          ) : (
+            <>
+              {unconfiguredDetected.map(d => (
+                <div key={d.key} className="flex items-center justify-between gap-2 py-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                    <span className="font-mono text-xs text-surface-300 truncate">{d.key}</span>
+                    <span className="text-[10px] text-surface-600 truncate">{d.file}</span>
+                  </div>
+                  <button
+                    onClick={() => handleAddDetected(d.key)}
+                    className="flex-shrink-0 text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 transition-colors"
+                  >
+                    Configure
+                  </button>
+                </div>
+              ))}
+              {suggestions.length > 0 && (
+                <>
+                  <p className="text-xs text-surface-500 pt-1 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" /> Suggestions
+                  </p>
+                  {suggestions.map(s => (
+                    <div key={s.key} className="flex items-center justify-between gap-2 py-1">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono text-xs text-surface-400 truncate">{s.key}</span>
+                        <span className="text-[10px] text-surface-600">{s.description}</span>
+                      </div>
+                      <button
+                        onClick={() => handleAddDetected(s.key)}
+                        className="flex-shrink-0 text-[10px] px-2 py-0.5 rounded bg-surface-800 text-surface-300 hover:bg-surface-700 transition-colors"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  ))}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Var list */}
       {isLoading ? (
@@ -205,7 +310,7 @@ export function EnvVarsPanel({ projectId }: EnvVarsPanelProps) {
       <div className="flex items-start gap-1.5 pt-1">
         <Info className="w-3 h-3 text-surface-500 mt-0.5 flex-shrink-0" />
         <p className="text-xs text-surface-500">
-          Variables are injected into EAS builds via expo.extra in app config.
+          Variables are injected into EAS builds and pushed to live containers.
         </p>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { useDeployStore, type Deployment, type DeploymentStatus } from '@/stores/deployStore';
 import { api } from '@/lib/api';
+import { projectsApi } from '@/lib/projects';
 import { getSocket } from '@/lib/socket';
 
 interface UseDeploymentReturn {
@@ -10,10 +11,11 @@ interface UseDeploymentReturn {
   wake: () => Promise<void>;
   destroy: () => Promise<void>;
   provision: () => Promise<void>;
+  scale: (instances: 0 | 1) => Promise<void>;
 }
 
 export function useDeployment(projectId: string | undefined): UseDeploymentReturn {
-  const { setDeployment, updateStatus, getDeployment, removeDeployment } = useDeployStore();
+  const { setDeployment, updateStatus, bumpRevision, getDeployment, removeDeployment } = useDeployStore();
   const fetchedRef = useRef(false);
 
   // Fetch initial state on mount
@@ -24,8 +26,8 @@ export function useDeployment(projectId: string | undefined): UseDeploymentRetur
     api
       .get<{ data: any }>(`/projects/${projectId}/container/status`)
       .then((res) => {
-        const data = res.data.data;
-        if (data.status && data.status !== 'none') {
+        const data = res.data?.data ?? res.data;
+        if (data?.status && data.status !== 'none') {
           setDeployment(projectId, {
             id: data.id,
             projectId,
@@ -38,6 +40,9 @@ export function useDeployment(projectId: string | undefined): UseDeploymentRetur
             lastDeployedAt: data.lastDeployedAt,
             lastActivityAt: data.lastActivityAt,
             memoryMb: data.memoryMb,
+            desiredInstances: data.desiredInstances,
+            actualInstances: data.actualInstances,
+            scaleMode: data.scaleMode,
           });
         }
       })
@@ -69,6 +74,8 @@ export function useDeployment(projectId: string | undefined): UseDeploymentRetur
         expoUrl: data.expoUrl,
         status: 'running',
       });
+      // Bump revision to trigger iframe refresh
+      bumpRevision(projectId);
     };
 
     const handleError = (data: { projectId: string; error: string }) => {
@@ -80,21 +87,55 @@ export function useDeployment(projectId: string | undefined): UseDeploymentRetur
       projectId: string;
       status: DeploymentStatus;
       error?: string;
+      webUrl?: string;
     }) => {
       if (data.projectId !== projectId) return;
-      updateStatus(projectId, data.status, data.error);
+      if (data.webUrl) {
+        const existing = getDeployment(projectId);
+        setDeployment(projectId, {
+          ...existing,
+          projectId,
+          appName: existing?.appName || '',
+          webUrl: data.webUrl,
+          status: data.status,
+        });
+      } else {
+        updateStatus(projectId, data.status, data.error);
+      }
+    };
+
+    const handleScale = (data: {
+      projectId: string;
+      desiredInstances: number;
+      actualInstances: number;
+      status: DeploymentStatus;
+      scaleMode?: string;
+    }) => {
+      if (data.projectId !== projectId) return;
+      const existing = getDeployment(projectId);
+      if (existing) {
+        setDeployment(projectId, {
+          ...existing,
+          desiredInstances: data.desiredInstances,
+          actualInstances: data.actualInstances,
+          status: data.status,
+          scaleMode: (data.scaleMode as Deployment['scaleMode']) || existing.scaleMode,
+        });
+      }
     };
 
     socket.on('deploy:ready', handleReady);
     socket.on('deploy:error', handleError);
     socket.on('deploy:status', handleStatus);
+    socket.on('deploy:scale', handleScale);
 
     return () => {
       socket.off('deploy:ready', handleReady);
       socket.off('deploy:error', handleError);
       socket.off('deploy:status', handleStatus);
+      socket.off('deploy:scale', handleScale);
     };
-  }, [projectId, setDeployment, updateStatus]);
+  }, [projectId, setDeployment, updateStatus, bumpRevision, getDeployment]);
 
   const deployment = projectId ? getDeployment(projectId) : undefined;
 
@@ -102,10 +143,11 @@ export function useDeployment(projectId: string | undefined): UseDeploymentRetur
     if (!projectId) return;
     updateStatus(projectId, 'provisioning');
     try {
-      const res = await api.post<{ data: any }>(
+      const res = await api.post(
         `/projects/${projectId}/container/wake`,
       );
-      updateStatus(projectId, res.data.data.status || 'running');
+      const wakeData = res.data?.data ?? res.data;
+      updateStatus(projectId, wakeData?.status || 'running');
     } catch (err: any) {
       updateStatus(projectId, 'error', err.message);
     }
@@ -125,10 +167,10 @@ export function useDeployment(projectId: string | undefined): UseDeploymentRetur
     if (!projectId) return;
     updateStatus(projectId, 'provisioning');
     try {
-      const res = await api.post<{ data: any }>(
+      const res = await api.post(
         `/projects/${projectId}/container/provision`,
       );
-      const data = res.data.data;
+      const data = res.data?.data ?? res.data;
       setDeployment(projectId, {
         id: data.id,
         projectId,
@@ -142,6 +184,37 @@ export function useDeployment(projectId: string | undefined): UseDeploymentRetur
     }
   }, [projectId, setDeployment, updateStatus]);
 
+  const scale = useCallback(async (instances: 0 | 1) => {
+    if (!projectId) return;
+    const existing = getDeployment(projectId);
+    if (existing) {
+      // Optimistic update: set desired immediately
+      setDeployment(projectId, {
+        ...existing,
+        desiredInstances: instances,
+        status: instances === 1 ? 'provisioning' : existing.status,
+      });
+    }
+    try {
+      const result = await projectsApi.scaleContainer(projectId, instances);
+      const current = getDeployment(projectId);
+      if (current) {
+        setDeployment(projectId, {
+          ...current,
+          desiredInstances: result.desiredInstances,
+          actualInstances: result.actualInstances,
+          status: result.status as DeploymentStatus,
+        });
+      }
+    } catch (err: any) {
+      // Revert optimistic update
+      if (existing) {
+        setDeployment(projectId, existing);
+      }
+      updateStatus(projectId, 'error', err.message);
+    }
+  }, [projectId, getDeployment, setDeployment, updateStatus]);
+
   return {
     deployment,
     status: deployment?.status || 'none',
@@ -149,5 +222,6 @@ export function useDeployment(projectId: string | undefined): UseDeploymentRetur
     wake,
     destroy,
     provision,
+    scale,
   };
 }

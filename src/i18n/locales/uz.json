@@ -1,0 +1,220 @@
+{
+  "nav": {
+    "features": "Imkoniyatlar",
+    "howItWorks": "Qanday ishlaydi",
+    "pricing": "Tariflar",
+    "signIn": "Kirish",
+    "startBuilding": "Boshlash",
+    "dashboard": "Boshqaruv"
+  },
+  "hero": {
+    "badge": "AI mobil muhandis",
+    "titleLine1": "Tasvirlab bering.",
+    "titleLine2": "Biz yaratamiz.",
+    "subtitle1": "Bitta suhbatdan tayyor React Native ilovalar.",
+    "subtitle2": "Telefoningizda darhol sinab ko'ring.",
+    "inputPlaceholder": "Yaratmoqchi bo'lgan mobil ilovangizni tasvirlab bering..."
+  },
+  "product": {
+    "label": "Siz nima olasiz",
+    "titleLine1": "Prototip emas.",
+    "titleLine2": "Haqiqiy ilova.",
+    "description": "AppX ishlab chiqarishga tayyor React Native kod yaratadi — navigatsiya, holat boshqaruvi va ma'lumotlar oqimi bilan ko'p ekranli ilovalar. QR kodni skanerlang, haqiqiy telefoningizda sinab ko'ring."
+  },
+  "features": {
+    "title1": "Kerakli hamma narsa",
+    "title2": "ishga tushirish uchun.",
+    "items": {
+      "multiScreen": {
+        "title": "Ko'p ekranli generatsiya",
+        "desc": "Butun ilovani tasvirlab bering. Navigatsiya, holat boshqaruvi va ma'lumotlar oqimi bilan to'liq loyiha oling."
+      },
+      "livePreview": {
+        "title": "Qurilmada jonli ko'rish",
+        "desc": "QR kodni skanerlang. Telefoningizda soniyalarda sinab ko'ring. Haqiqiy qurilma, haqiqiy ishlash."
+      },
+      "chatDriven": {
+        "title": "Chat orqali tahrirlash",
+        "desc": "Har qanday ekranni suhbat orqali yaxshilang. Tartib, ranglar, mantiqni o'zgartiring."
+      },
+      "publish": {
+        "title": "Bir bosishda nashr",
+        "desc": "Vebga darhol joylashtiring. GitHub ga eksport qiling. EAS bilan yig'ing. App Store va Google Play ga joylashtiring."
+      }
+    }
+  },
+  "howItWorks": {
+    "label": "Qanday ishlaydi",
+    "describe": {
+      "word": "Tasvirlang",
+      "desc": "Nima yaratmoqchi ekanligingizni ayting. Oddiy tilda. Hammasi shu."
+    },
+    "generate": {
+      "word": "Generatsiya",
+      "desc": "AI ishlab chiqarishga tayyor React Native kod yozadi. Real vaqtda kuzating."
+    },
+    "ship": {
+      "word": "Ishga tushirish",
+      "desc": "Telefoningizda sinang. GitHub ga push qiling. Storlarga joylashtiring."
+    }
+  },
+  "statement": {
+    "pre": "G'oyadan",
+    "highlight": "App Store",
+    "mid": "gacha soatlarda,",
+    "end": "oylarda emas."
+  },
+  "pricing": {
+    "title": "Oddiy tariflar",
+    "subtitle": "Bepul boshlang. Tayyor bo'lganda yangilang.",
+    "mostPopular": "Mashhur",
+    "creditsPerMonth": "kredit / oy",
+    "free": {
+      "name": "Bepul",
+      "cta": "Boshlash"
+    },
+    "pro": {
+      "name": "Pro",
+      "cta": "Sinab ko'rish"
+    },
+    "business": {
+      "name": "Business",
+      "cta": "Sinab ko'rish"
+    },
+    "features": {
+      "projects": "{{count}} loyiha",
+      "containers": "{{count}} konteyner",
+      "dailyGenerations": "Kuniga {{count}} generatsiya",
+      "unlimitedGenerations": "Cheksiz generatsiyalar",
+      "unlimitedEverything": "Hammasi cheksiz",
+      "webPreview": "Veb-ko'rish",
+      "devicePreview": "Qurilmada ko'rish",
+      "customDomain": "Shaxsiy domen",
+      "codeExport": "Kod eksporti",
+      "githubIntegration": "GitHub integratsiya",
+      "alwaysOnContainers": "Konteynerlar 24/7",
+      "communitySupport": "Jamoa yordami",
+      "prioritySupport": "Ustuvor yordam",
+      "dedicatedSupport": "Shaxsiy yordam"
+    }
+  },
+  "cta": {
+    "title1": "Keyingi ilovangiz",
+    "title2": "bitta xabardan boshlanadi.",
+    "button": "Bepul boshlash"
+  },
+  "footer": {
+    "tagline": "Mobil ilovalar yaratish uchun AI platforma.",
+    "product": "Mahsulot",
+    "developers": "Dasturchilar",
+    "company": "Kompaniya",
+    "legal": "Huquqiy",
+    "documentation": "Hujjatlar",
+    "apiReference": "API ma'lumotnoma",
+    "status": "Holat",
+    "about": "Biz haqimizda",
+    "blog": "Blog",
+    "contact": "Aloqa",
+    "changelog": "O'zgarishlar",
+    "terms": "Shartlar",
+    "privacy": "Maxfiylik"
+  },
+  "composer": {
+    "placeholder": "Yaratmoqchi bo'lgan mobil ilovangizni tasvirlab bering...",
+    "examples": {
+      "fitness": "Mashqlar va grafiklar bilan fitness-treker",
+      "delivery": "Jonli kuzatish bilan yetkazib berish",
+      "meditation": "Meditatsiya ilovasi"
+    }
+  },
+  "dashboard": {
+    "title": "Boshqaruv paneli",
+    "buildYourApp": "Ilovangizni yarating",
+    "description": "Ilovani tasvirlab bering va AI uni daqiqalarda yaratadi",
+    "yourProjects": "Loyihalaringiz",
+    "projectCount": "{{count}} loyiha",
+    "newProject": "Yangi loyiha",
+    "lastEdited": "O'zgartirilgan",
+    "screens": "{{count}} ekran",
+    "draft": "Qoralama",
+    "published": "Nashr qilingan",
+    "noProjects": "Loyihalar hali yo'q",
+    "createFirst": "Birinchi ilovangizni yuqorida tasvirlab yarating"
+  },
+  "canvas": {
+    "aiChat": "AI chat",
+    "preview": "Ko'rish",
+    "code": "Kod",
+    "publish": "Nashr qilish",
+    "publishing": "Nashr qilinmoqda...",
+    "published": "Nashr qilindi",
+    "noScreens": "Ekranlar hali yo'q",
+    "useChat": "Chatdan foydalanib ekranlarni tasvirlab bering.",
+    "console": "Konsol",
+    "expand": "Kengaytirish",
+    "collapse": "Yig'ish",
+    "fixWithAI": "AI bilan tuzatish",
+    "clear": "Tozalash",
+    "errors": "{{count}} xato",
+    "deviceTesting": "Sinov",
+    "testOnPhone": "Telefonda sinash",
+    "scanQR": "Sinash uchun QR skanerlang",
+    "deployToTest": "Sinash uchun joylashtiring",
+    "containersUsed": "{{used}}/{{max}} konteyner",
+    "containerLimit": "Konteyner limiti tugadi",
+    "upgradePlan": "Tarifni yangilash",
+    "manageContainers": "Konteynerlarni boshqarish"
+  },
+  "settings": {
+    "appIdentity": "Identifikatsiya",
+    "projectName": "Loyiha nomi",
+    "urlIdentifiers": "URL va identifikatorlar",
+    "appIcon": "Ilova ikonkasi",
+    "envVars": "Muhit o'zgaruvchilari",
+    "apiDocs": "API hujjatlar",
+    "container": "Konteyner / Sandbox",
+    "status": "Holat",
+    "liveUrl": "Jonli URL",
+    "expoUrl": "Expo URL",
+    "subdomain": "Subdomen",
+    "memory": "Xotira",
+    "deploys": "Joylashtirish",
+    "alwaysOn": "Doimo yoniq",
+    "alwaysOnCost": "5 kredit/kun",
+    "customSubdomain": "Shaxsiy subdomen",
+    "customDomain": "Shaxsiy domen",
+    "addDomain": "Domen qo'shish",
+    "verifyDns": "DNS tekshirish",
+    "removeDomain": "O'chirish",
+    "dangerZone": "Xavfli zona",
+    "deleteProject": "Loyihani o'chirish",
+    "save": "Saqlash",
+    "cancel": "Bekor qilish"
+  },
+  "auth": {
+    "welcomeTo": "AppX ga xush kelibsiz",
+    "signInContinue": "Davom etish uchun kiring",
+    "continueWithGoogle": "Google orqali kirish",
+    "or": "yoki",
+    "email": "Elektron pochta",
+    "password": "Parol",
+    "signInWithEmail": "Pochta bilan kirish",
+    "createAccount": "Hisob yaratish",
+    "alreadyHaveAccount": "Hisobingiz bormi?",
+    "dontHaveAccount": "Hisobingiz yo'qmi?"
+  },
+  "common": {
+    "loading": "Yuklanmoqda",
+    "pleaseWait": "Kuting...",
+    "error": "Xato",
+    "retry": "Qayta urinish",
+    "copied": "Nusxalandi!",
+    "urlCopied": "URL nusxalandi!",
+    "proRequired": "Pro tarif kerak"
+  },
+  "language": {
+    "en": "English",
+    "ru": "Русский",
+    "uz": "O'zbek"
+  }
+}

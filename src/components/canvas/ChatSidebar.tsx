@@ -223,6 +223,10 @@ export interface ChatSidebarProps {
   onFeaturesChange?: (features: string[]) => void;
   /** Reference image URL from project creation (shown on first user message) */
   referenceImageUrl?: string | null;
+  /** Emit undo for a chat edit (screenId, versionId) */
+  emitEditUndo?: (screenId: string, versionId: string) => void;
+  /** Callback when an edit is undone via socket */
+  onEditUndone?: (callback: (data: { screenId: string; versionId: string; screen: any }) => void) => void;
 }
 
 export function ChatSidebar({
@@ -268,6 +272,8 @@ export function ChatSidebar({
   enabledFeatures = [],
   onFeaturesChange,
   referenceImageUrl,
+  emitEditUndo,
+  onEditUndone,
 }: ChatSidebarProps) {
   const {
     messages: localMessages,
@@ -556,6 +562,8 @@ export function ChatSidebar({
                     executionMode: planModeRef.current ? "Plan" : "Direct",
                     ...(resolvedActionLogs ? { actionLogs: resolvedActionLogs } : {}),
                     ...(data.changeSummary ? { changeSummary: data.changeSummary } : {}),
+                    ...(data.previousVersionId ? { previousVersionId: data.previousVersionId } : {}),
+                    ...(data.editedScreenId ? { editedScreenId: data.editedScreenId } : {}),
                     ...(data.planId ? { planId: data.planId, planVersion: data.planVersion } : {}),
                     ...(data.planSteps ? { planSteps: data.planSteps } : {}),
                   },
@@ -587,6 +595,8 @@ export function ChatSidebar({
                       ...msg.metadata,
                       executionMode: planModeRef.current ? "Plan" : "Direct",
                       ...(data.changeSummary ? { changeSummary: data.changeSummary } : {}),
+                    ...(data.previousVersionId ? { previousVersionId: data.previousVersionId } : {}),
+                    ...(data.editedScreenId ? { editedScreenId: data.editedScreenId } : {}),
                       ...(resolvedActionLogs ? { actionLogs: resolvedActionLogs } : {}),
                       ...(data.planId ? { planId: data.planId, planVersion: data.planVersion } : {}),
                       ...(data.planSteps ? { planSteps: data.planSteps } : {}),
@@ -615,6 +625,8 @@ export function ChatSidebar({
                   executionMode: planModeRef.current ? "Plan" : "Direct",
                   ...(resolvedActionLogs ? { actionLogs: resolvedActionLogs } : {}),
                   ...(data.changeSummary ? { changeSummary: data.changeSummary } : {}),
+                    ...(data.previousVersionId ? { previousVersionId: data.previousVersionId } : {}),
+                    ...(data.editedScreenId ? { editedScreenId: data.editedScreenId } : {}),
                   ...(data.planId ? { planId: data.planId, planVersion: data.planVersion } : {}),
                   ...(data.planSteps ? { planSteps: data.planSteps } : {}),
                 },
@@ -720,6 +732,22 @@ export function ChatSidebar({
       addedSkeletonNameRef.current = null;
     });
   }, [onSocketChatComplete, onGenerationEnd, onScreenCreated, onRemoveSkeletons, onSetScreenLoading, projectId, chatQueryClient]);
+
+  // Handle edit undo responses
+  useEffect(() => {
+    if (!onEditUndone) return;
+
+    onEditUndone((data) => {
+      // Mark messages that had this screenId + versionId as undone
+      setLocalMessages((prev) =>
+        prev.map((msg) =>
+          msg.metadata?.editedScreenId === data.screenId && msg.metadata?.previousVersionId === data.versionId
+            ? { ...msg, metadata: { ...msg.metadata, editUndone: true } }
+            : msg,
+        ),
+      );
+    });
+  }, [onEditUndone]);
 
   useEffect(() => {
     if (!onSocketChatError) return;
@@ -1901,6 +1929,9 @@ export function ChatSidebar({
                       const implementMessage = `Implement this plan:\n\n${planContent}\n\nOriginal request: ${userMsg.content}`;
                       const modelId = useModelStore.getState().getEffectiveModelId() || undefined;
                       socketSendMessage(implementMessage, effectiveScreenId, parentScreenId, false, enabledFeatures.length > 0 ? enabledFeatures : undefined, undefined, modelId);
+                    } : undefined}
+                    onUndoEdit={emitEditUndo ? (editScreenId, versionId) => {
+                      emitEditUndo(editScreenId, versionId);
                     } : undefined}
                     onEditMessage={(messageId, newContent) => {
                       // Update the message text and remove all subsequent messages

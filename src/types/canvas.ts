@@ -85,6 +85,9 @@ export interface LocalMessage {
       optional: RecommendationItem[];
     };
     changeSummary?: string[];
+    previousVersionId?: string;
+    editedScreenId?: string;
+    editUndone?: boolean;
     [key: string]: unknown;
   };
 }

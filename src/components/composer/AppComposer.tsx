@@ -21,10 +21,9 @@ import { useBillingStore } from '../../stores/billingStore';
 import { useModelStore } from '../../stores/modelStore';
 
 const EXAMPLE_PROMPTS = [
-  'Fitness tracker with workouts, progress charts & social challenges',
-  'Food delivery app with live order tracking and restaurant discovery',
-  'Meditation app with sleep sounds, streaks, and daily reminders',
-  'Crypto portfolio with real-time alerts and analytics dashboard',
+  'Fitness tracker with workouts & charts',
+  'Food delivery with live tracking',
+  'Meditation app with streaks',
 ];
 
 const MIN_DESCRIPTION_LENGTH = 50;
@@ -58,6 +57,16 @@ export function AppComposer({ showExamples = true, className }: AppComposerProps
   const [canPurchaseCredits, setCanPurchaseCredits] = useState(false);
 
   useEffect(() => { fetchModels(); }, [fetchModels]);
+
+  // Restore pending description from landing page redirect
+  useEffect(() => {
+    const pending = sessionStorage.getItem('pendingAppDescription');
+    if (pending && isAuthenticated) {
+      setAppDescription(pending);
+      sessionStorage.removeItem('pendingAppDescription');
+      setTimeout(adjustTextarea, 0);
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -296,7 +305,45 @@ export function AppComposer({ showExamples = true, className }: AppComposerProps
               <Plus className="w-4 h-4" />
             </button>
 
-            {availableModels.length > 0 && effectiveModel && (
+            {!isAuthenticated && (
+              <div ref={modelMenuRef} className="relative">
+                <button
+                  onClick={() => setShowModelMenu(!showModelMenu)}
+                  className={cn(
+                    'flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium transition-all',
+                    showModelMenu ? 'bg-surface-700 text-white' : 'text-surface-400 hover:text-surface-200 hover:bg-surface-800'
+                  )}
+                >
+                  <Sparkles className="w-3 h-3 text-primary-400" />
+                  <span>Auto</span>
+                </button>
+                <AnimatePresence>
+                  {showModelMenu && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 4 }}
+                      className="absolute bottom-full left-0 mb-2 w-64 bg-surface-900 border border-surface-700 rounded-xl shadow-xl overflow-hidden z-50"
+                    >
+                      <div className="p-2 border-b border-surface-800">
+                        <p className="text-[11px] text-primary-400 font-medium text-center">Sign in to select a model</p>
+                      </div>
+                      <div className="p-1.5 opacity-50 pointer-events-none">
+                        {availableModels.length > 0 ? availableModels.map((m) => (
+                          <div key={m.id} className="flex items-center justify-between px-3 py-2 rounded-lg">
+                            <span className="text-sm text-surface-300">{m.displayName}</span>
+                            <span className="text-xs text-surface-500">{m.isFree ? 'Free' : `${m.creditCost || 1}cr`}</span>
+                          </div>
+                        )) : (
+                          <div className="px-3 py-2 text-xs text-surface-500 text-center">Loading models...</div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+            {isAuthenticated && availableModels.length > 0 && effectiveModel && (
               <div ref={modelMenuRef} className="relative">
                 <button
                   onClick={() => setShowModelMenu(!showModelMenu)}

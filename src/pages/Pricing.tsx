@@ -7,7 +7,6 @@ import {
   X,
   Sparkles,
   Crown,
-  Zap,
   Users,
   Loader2,
   LogOut,
@@ -17,37 +16,62 @@ import { useAuthStore } from '@/stores/authStore';
 import { hasActiveSubscription } from '@/lib/auth';
 import { paymentsApi, PLAN_FEATURES, CREDIT_PACKS } from '@/lib';
 
-type PlanKey = 'free' | 'starter' | 'pro' | 'business';
+type PlanKey = 'free' | 'pro' | 'business';
+type Billing = 'monthly' | 'annual';
 
 interface PlanCardProps {
   plan: PlanKey;
-  currentPlan: PlanKey;
+  currentPlan: string;
   isPopular?: boolean;
+  billing: Billing;
   onSelect: (plan: PlanKey) => void;
   isLoading: boolean;
 }
 
-function PlanCard({ plan, currentPlan, isPopular, onSelect, isLoading }: PlanCardProps) {
+function PlanCard({ plan, currentPlan, isPopular, billing, onSelect, isLoading }: PlanCardProps) {
   const features = PLAN_FEATURES[plan];
   const isCurrentPlan = plan === currentPlan;
 
   const planIcons: Record<PlanKey, typeof Users> = {
     free: Users,
-    starter: Zap,
     pro: Crown,
     business: Sparkles,
   };
 
   const Icon = planIcons[plan];
 
-  const allFeatures = [
+  // Compute display price based on billing cycle
+  const monthlyPrice = features.price;
+  const annualMonthlyPrice = plan === 'free' ? 0 : Math.round(monthlyPrice * 0.8);
+  const displayPrice = billing === 'annual' ? annualMonthlyPrice : monthlyPrice;
+  const annualTotal = annualMonthlyPrice * 12;
+
+  const allFeatures: { label: string; included: boolean }[] = [
     { label: `${features.credits} credits/month`, included: true },
-    { label: `Up to ${features.screens === Infinity ? 'Unlimited' : features.screens} screens`, included: true },
-    { label: `${features.projects === Infinity ? 'Unlimited' : features.projects} project${features.projects !== 1 ? 's' : ''}`, included: true },
-    { label: features.codeExports === Infinity ? 'Unlimited code exports' : `${features.codeExports} code exports`, included: true },
-    { label: `${features.support} support`, included: true },
-    { label: 'Purchase additional credits', included: features.canPurchaseCredits },
+    {
+      label: `${features.projects === Infinity ? 'Unlimited' : features.projects} project${features.projects !== 1 ? 's' : ''}`,
+      included: true,
+    },
+    {
+      label: `${features.containers === Infinity ? 'Unlimited' : features.containers} container${(features.containers as number) !== 1 ? 's' : ''}`,
+      included: true,
+    },
+    {
+      label: features.dailyGenerationLimit === Infinity ? 'Unlimited daily generations' : `${features.dailyGenerationLimit} generations/day`,
+      included: true,
+    },
+    { label: 'Custom subdomain', included: features.customSubdomain },
+    { label: 'Custom domain', included: features.customDomain },
+    { label: 'Always-on containers (5 credits/day)', included: features.alwaysOn },
+    { label: 'Code export', included: features.codeExport },
+    { label: 'GitHub integration', included: features.githubConnect },
   ];
+
+  const planDescriptions: Record<PlanKey, string> = {
+    free: 'Try it out before you commit',
+    pro: 'For power users and growing teams',
+    business: 'For teams and agencies at scale',
+  };
 
   return (
     <motion.div
@@ -60,8 +84,8 @@ function PlanCard({ plan, currentPlan, isPopular, onSelect, isLoading }: PlanCar
           : 'bg-surface-800/50 border-surface-700/50 hover:border-surface-600'
       )}
     >
-      {isPopular && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary-500 text-white text-xs font-semibold rounded-full">
+      {isPopular && !isCurrentPlan && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary-500 text-white text-xs font-semibold rounded-full whitespace-nowrap">
           Most Popular
         </div>
       )}
@@ -81,16 +105,22 @@ function PlanCard({ plan, currentPlan, isPopular, onSelect, isLoading }: PlanCar
         <h3 className="text-xl font-bold text-white">{features.name}</h3>
       </div>
 
-      <div className="mb-6">
-        <span className="text-4xl font-bold text-white">${features.price}</span>
-        <span className="text-surface-400">/month</span>
+      <div className="mb-1">
+        <span className="text-4xl font-bold text-white">${displayPrice}</span>
+        <span className="text-surface-400">/mo</span>
       </div>
 
+      {billing === 'annual' && plan !== 'free' && (
+        <p className="text-xs text-primary-400 mb-4">
+          billed annually (${annualTotal}/yr)
+        </p>
+      )}
+      {(billing === 'monthly' || plan === 'free') && (
+        <div className="mb-4" />
+      )}
+
       <p className="text-sm text-surface-400 mb-6">
-        {plan === 'free' && 'Try it out before you commit'}
-        {plan === 'starter' && 'For designers and solo creators'}
-        {plan === 'pro' && 'For power users and growing teams'}
-        {plan === 'business' && 'For teams and agencies at scale'}
+        {planDescriptions[plan]}
       </p>
 
       <ul className="space-y-3 mb-6">
@@ -189,9 +219,10 @@ export default function Pricing() {
   const { user, isAuthenticated, logout, refreshUser } = useAuthStore();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [loadingPack, setLoadingPack] = useState<string | null>(null);
+  const [billing, setBilling] = useState<Billing>('monthly');
 
-  const currentPlan = (user?.plan as PlanKey) || 'free';
-  const canPurchaseCredits = PLAN_FEATURES[currentPlan].canPurchaseCredits;
+  const currentPlan = (user?.plan as string) || 'free';
+  const canPurchaseCredits = PLAN_FEATURES[currentPlan as PlanKey]?.canPurchaseCredits ?? false;
   const creditsBalance = parseFloat(user?.creditsRemaining || '0');
   const isCheckoutSuccess = searchParams.get('checkout') === 'success';
   const isRegistrationFlow = isAuthenticated && user?.plan === 'free' && !isCheckoutSuccess;
@@ -218,7 +249,8 @@ export default function Pricing() {
         await refreshUser();
         const freshUser = useAuthStore.getState().user;
         if (freshUser && hasActiveSubscription(freshUser)) {
-          const planName = PLAN_FEATURES[freshUser.plan as PlanKey]?.name || freshUser.plan;
+          const planKey = freshUser.plan as keyof typeof PLAN_FEATURES;
+          const planName = PLAN_FEATURES[planKey]?.name || freshUser.plan;
           setActivatedPlan(planName ?? null);
           // Show the success screen for 2 seconds before redirecting
           await new Promise(r => setTimeout(r, 2000));
@@ -303,7 +335,7 @@ export default function Pricing() {
       const successUrl = isRegistrationFlow
         ? `${window.location.origin}/pricing?checkout=success`
         : undefined;
-      const response = await paymentsApi.createCheckout(plan as 'starter' | 'pro' | 'business', successUrl);
+      const response = await paymentsApi.createCheckout(plan as 'pro' | 'business', successUrl, billing);
       const url = response.data?.data?.url;
       if (url) {
         window.location.href = url;
@@ -372,7 +404,7 @@ export default function Pricing() {
       </header>
 
       <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="text-center mb-12">
+        <div className="text-center mb-10">
           {isRegistrationFlow && (
             <div className="mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-500/10 border border-primary-500/30 text-primary-400 text-sm font-medium">
               <Sparkles className="w-4 h-4" />
@@ -382,34 +414,65 @@ export default function Pricing() {
           <h2 className="text-3xl font-bold text-white mb-4">
             Choose Your Plan
           </h2>
-          <p className="text-surface-400 max-w-2xl mx-auto">
-            All plans include access to our AI-powered design generation.
+          <p className="text-surface-400 max-w-2xl mx-auto mb-8">
+            All plans include access to our AI-powered app generation.
           </p>
+
+          {/* Billing toggle */}
+          <div className="inline-flex items-center gap-3 bg-surface-800/60 border border-surface-700/50 rounded-full px-2 py-1.5">
+            <button
+              onClick={() => setBilling('monthly')}
+              className={cn(
+                'px-4 py-1.5 rounded-full text-sm font-medium transition-all',
+                billing === 'monthly'
+                  ? 'bg-surface-700 text-white shadow'
+                  : 'text-surface-400 hover:text-white'
+              )}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setBilling('annual')}
+              className={cn(
+                'px-4 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5',
+                billing === 'annual'
+                  ? 'bg-primary-500 text-white shadow shadow-primary-500/30'
+                  : 'text-surface-400 hover:text-white'
+              )}
+            >
+              Annual
+              <span className={cn(
+                'text-xs px-1.5 py-0.5 rounded-full font-semibold',
+                billing === 'annual'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-green-500/20 text-green-400'
+              )}>
+                Save 20%
+              </span>
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-16">
           <PlanCard
             plan="free"
             currentPlan={currentPlan}
+            billing={billing}
             onSelect={handleSelectPlan}
             isLoading={loadingPlan === 'free'}
           />
           <PlanCard
-            plan="starter"
-            currentPlan={currentPlan}
-            isPopular
-            onSelect={handleSelectPlan}
-            isLoading={loadingPlan === 'starter'}
-          />
-          <PlanCard
             plan="pro"
             currentPlan={currentPlan}
+            isPopular
+            billing={billing}
             onSelect={handleSelectPlan}
             isLoading={loadingPlan === 'pro'}
           />
           <PlanCard
             plan="business"
             currentPlan={currentPlan}
+            billing={billing}
             onSelect={handleSelectPlan}
             isLoading={loadingPlan === 'business'}
           />
@@ -420,7 +483,7 @@ export default function Pricing() {
             Need more credits?
           </h3>
           <p className="text-surface-400 mb-2">
-            Starter and Pro subscribers can purchase additional credit packs anytime.
+            Pro and Business subscribers can purchase additional credit packs anytime.
           </p>
           {isAuthenticated && (
             <p className="text-surface-500 text-sm">
@@ -443,10 +506,9 @@ export default function Pricing() {
 
         {!canPurchaseCredits && isAuthenticated && (
           <p className="text-center text-surface-500 text-sm mt-4">
-            Upgrade to Starter or Pro to purchase additional credits.
+            Upgrade to Pro or Business to purchase additional credits.
           </p>
         )}
-
       </main>
     </div>
   );

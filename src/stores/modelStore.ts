@@ -29,6 +29,18 @@ export const useModelStore = create<ModelStore>((set, get) => ({
       set({ availableModels: modelArray, loading: false, hasFetched: true });
     } catch (e) {
       console.error('[ModelStore] Failed to fetch AI models:', e);
+      // Fallback: fetch public model list (no auth required)
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || '/api/v1'}/payments/ai-models/public`);
+        if (res.ok) {
+          const data = await res.json();
+          const models = Array.isArray(data) ? data : data?.data || [];
+          if (models.length > 0) {
+            set({ availableModels: models, loading: false, hasFetched: true });
+            return;
+          }
+        }
+      } catch { /* ignore */ }
       set({ loading: false, hasFetched: false });
     }
   },

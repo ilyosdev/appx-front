@@ -163,6 +163,13 @@ export function PlanApprovalModal({
     if (enriched.length > 0) {
       changes.push(`Enriched ${enriched.map(s => s.name).join(', ')}`);
     }
+    // Detect design reasoning / visual description changes
+    if ((prev as any).designReasoning !== (next as any).designReasoning) {
+      changes.push('Updated design reasoning');
+    }
+    if ((prev as any).projectVisualDescription !== (next as any).projectVisualDescription) {
+      changes.push('Updated visual direction');
+    }
     return changes.length > 0 ? changes.join('. ') + '.' : 'Plan updated.';
   }, []);
 

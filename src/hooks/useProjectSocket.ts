@@ -54,6 +54,10 @@ export interface ChatCompleteData {
     category: 'essential' | 'optional';
   }>;
   changeSummary?: string[] | null;
+  /** Version ID of the screen state before the edit (for undo) */
+  previousVersionId?: string | null;
+  /** Screen ID that was edited (for undo) */
+  editedScreenId?: string | null;
   actionLogs?: ActionLogEvent[];
   /** Error message when intent could not be fulfilled (e.g. modify_failed) */
   error?: string;
@@ -190,6 +194,10 @@ interface UseProjectSocketReturn {
   onChatComplete: (callback: (data: ChatCompleteData) => void) => void;
   onChatError: (callback: (error: string, code?: string) => void) => void;
   retryScreen: (screen: { name: string; purpose: string; layoutDescription: string; skeletonId: string }) => void;
+
+  // Edit undo
+  emitEditUndo: (screenId: string, versionId: string) => void;
+  onEditUndone: (callback: (data: { screenId: string; versionId: string; screen: any }) => void) => void;
 
   // Design system generation
   designSystemState: DesignSystemState;
@@ -443,6 +451,13 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
           chatErrorCallbackRef.current(data.error, data.code);
         } else {
           pendingChatErrorRef.current.push({ error: data.error, code: data.code });
+        }
+      });
+
+      // ---------- Edit undo events ----------
+      socket.on('chat:edit-undone', (data: { screenId: string; versionId: string; screen: any }) => {
+        if (editUndoneCallbackRef.current) {
+          editUndoneCallbackRef.current(data);
         }
       });
 
@@ -885,6 +900,17 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
     socketRef.current.emit('chat:send', { message, screenId, parentScreenId, planMode, enabledFeatures, imageUrls, modelId, planId });
   }, []);
 
+  const editUndoneCallbackRef = useRef<((data: { screenId: string; versionId: string; screen: any }) => void) | null>(null);
+
+  const emitEditUndo = useCallback((screenId: string, versionId: string) => {
+    if (!socketRef.current?.connected) return;
+    socketRef.current.emit('chat:edit-undo', { screenId, versionId });
+  }, []);
+
+  const onEditUndone = useCallback((callback: (data: { screenId: string; versionId: string; screen: any }) => void) => {
+    editUndoneCallbackRef.current = callback;
+  }, []);
+
   const startGeneration = useCallback((params: GenerationStartParams) => {
     console.log('[Socket] startGeneration called', { connected: socketRef.current?.connected, screenCount: params.screens.length });
     if (!socketRef.current?.connected) {
@@ -1058,6 +1084,8 @@ export function useProjectSocket(projectId: string | undefined, wsUrl?: string):
     onChatComplete,
     onChatError,
     retryScreen,
+    emitEditUndo,
+    onEditUndone,
     designSystemState,
     generateDesignSystem,
   };

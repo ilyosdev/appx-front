@@ -27,8 +27,10 @@ import {
 import { cn } from "@/lib/utils";
 
 import { projectsApi, type DesignSystemCustomization } from "@/lib/projects";
+import { useDeployment } from "@/hooks/useDeployment";
+import { useDeployStore } from "@/stores/deployStore";
 import { DesignSystemCustomizer } from "@/components/projects/DesignSystemCustomizer";
-import { PublishModal } from "@/components/projects/PublishModal";
+// PublishModal — coming soon
 import { chatApi } from "@/lib/chat";
 import { useAuthStore } from "@/stores/authStore";
 import { generateScreenThumbnail } from "@/lib/screenshot";
@@ -50,14 +52,15 @@ import type { ScreenData, RecommendationItem } from "@/types/canvas";
 import { CanvasHeader } from "@/components/canvas/CanvasHeader";
 import { ChatSidebar } from "@/components/canvas/ChatSidebar";
 import { PhonePreviewPanel } from "@/components/canvas/PhonePreviewPanel";
-import { ExportModal } from "@/components/canvas/ExportModal";
+// ExportModal — coming soon
 import { ProjectSettingsModal } from "@/components/canvas/ProjectSettingsModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { WebPreview } from "@/components/preview/WebPreview";
 import { PreviewConsole } from "@/components/preview/PreviewConsole";
+import { DeviceTestingSidebar } from "@/components/canvas/DeviceTestingSidebar";
 import { PlanApprovalModal } from "@/components/canvas/PlanApprovalModal";
 import { VersionHistoryModal } from "@/components/canvas/VersionHistoryModal";
-import { TestPanel } from "@/components/project/TestPanel";
+// TestPanel — replaced by inline deployment in CanvasHeader
 import { DesignSystemPanel } from "@/components/canvas/DesignSystemPanel";
 
 const MonacoEditor = lazy(() => import("@monaco-editor/react").then(m => ({ default: m.default })));
@@ -79,6 +82,7 @@ function PiPPreview({ children, onClose, onRefresh }: {
   const pipRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ x: -1, y: -1 });
   const [pipScale, setPipScale] = useState(0.35);
+  const [isInteracting, setIsInteracting] = useState(false);
   const dragging = useRef(false);
   const resizing = useRef(false);
   const dragOffset = useRef({ x: 0, y: 0 });
@@ -96,6 +100,7 @@ function PiPPreview({ children, onClose, onRefresh }: {
   const onDragStart = useCallback((e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button')) return;
     dragging.current = true;
+    setIsInteracting(true);
     const rect = pipRef.current!.getBoundingClientRect();
     dragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     e.preventDefault();
@@ -107,32 +112,34 @@ function PiPPreview({ children, onClose, onRefresh }: {
         y: Math.max(0, Math.min(ev.clientY - parent.top - dragOffset.current.y, parent.height - displayH)),
       });
     };
-    const onUp = () => { dragging.current = false; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    const onUp = () => { dragging.current = false; setIsInteracting(false); window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   }, [displayW, displayH]);
 
-  // Resize by dragging corner — changes scale, not viewport
   const onResizeStart = useCallback((e: React.MouseEvent) => {
     resizing.current = true;
+    setIsInteracting(true);
     const startX = e.clientX;
+    const startY = e.clientY;
     const startScale = pipScale;
     e.preventDefault();
     e.stopPropagation();
     const onMove = (ev: MouseEvent) => {
       if (!resizing.current) return;
       const dx = ev.clientX - startX;
-      const newScale = Math.max(0.2, Math.min(0.6, startScale + dx / FRAME_W));
-      setPipScale(newScale);
+      const dy = ev.clientY - startY;
+      const delta = Math.max(dx, dy);
+      setPipScale(Math.max(0.2, Math.min(0.7, startScale + delta / (FRAME_W * 0.3))));
     };
-    const onUp = () => { resizing.current = false; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    const onUp = () => { resizing.current = false; setIsInteracting(false); window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   }, [pipScale, FRAME_W]);
 
   const onWheel = useCallback((e: React.WheelEvent) => {
     e.stopPropagation();
-    setPipScale(prev => Math.max(0.2, Math.min(0.6, prev - e.deltaY * 0.001)));
+    setPipScale(prev => Math.max(0.2, Math.min(0.7, prev - e.deltaY * 0.003)));
   }, []);
 
   return (
@@ -156,15 +163,25 @@ function PiPPreview({ children, onClose, onRefresh }: {
       {/* Resize handle — bottom-right corner */}
       <div
         onMouseDown={onResizeStart}
-        className="absolute -bottom-1.5 -right-1.5 w-5 h-5 cursor-se-resize z-30 flex items-end justify-end"
+        className="absolute -bottom-2 -right-2 w-8 h-8 cursor-se-resize z-30 flex items-end justify-end p-1"
         title="Drag to resize"
       >
-        <svg className="w-3.5 h-3.5 text-surface-500" viewBox="0 0 10 10" fill="currentColor">
-          <circle cx="8" cy="8" r="1.2" />
-          <circle cx="8" cy="4.5" r="1.2" />
-          <circle cx="4.5" cy="8" r="1.2" />
+        <svg className="w-4 h-4 text-surface-400" viewBox="0 0 10 10" fill="currentColor">
+          <circle cx="8" cy="8" r="1.4" />
+          <circle cx="8" cy="4" r="1.4" />
+          <circle cx="4" cy="8" r="1.4" />
         </svg>
       </div>
+      {/* Resize handle — bottom edge */}
+      <div
+        onMouseDown={onResizeStart}
+        className="absolute -bottom-1 left-1/4 right-1/4 h-3 cursor-s-resize z-30"
+      />
+      {/* Resize handle — right edge */}
+      <div
+        onMouseDown={onResizeStart}
+        className="absolute -right-1 top-1/4 bottom-1/4 w-3 cursor-e-resize z-30"
+      />
 
       {/* Action buttons — outside scaled frame so they stay normal size */}
       <div className="absolute -top-2 -right-2 z-30 flex items-center gap-1">
@@ -191,7 +208,7 @@ function PiPPreview({ children, onClose, onRefresh }: {
             </div>
           </div>
           {/* Screen — real device resolution */}
-          <div className="bg-white overflow-hidden" style={{ width: DEVICE_W, height: DEVICE_H, borderRadius: 38 }}>
+          <div className="bg-white overflow-hidden" style={{ width: DEVICE_W, height: DEVICE_H, borderRadius: 38, pointerEvents: isInteracting ? 'none' : 'auto' }}>
             {children}
           </div>
           {/* Home indicator */}
@@ -333,8 +350,9 @@ export default function ProjectPage() {
   const [savingFile, setSavingFile] = useState<string | null>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mobileTab, setMobileTab] = useState<'chat' | 'preview' | 'test'>('chat');
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [publishModalOpen, setPublishModalOpen] = useState(false);
+  // Deployment — live preview via Railover container
+  const { deployment, provision, wake } = useDeployment(projectId);
+  const deploymentWebUrl = useMemo(() => deployment?.webUrl || null, [deployment?.webUrl]);
   const [triggerMessage, setTriggerMessage] = useState<string | undefined>();
   const [triggerScreenId, setTriggerScreenId] = useState<string | undefined>();
   const [variationParentId, setVariationParentId] = useState<string | undefined>();
@@ -342,9 +360,7 @@ export default function ProjectPage() {
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [designSystemOpen, setDesignSystemOpen] = useState(false);
   const chatResize = useResizablePanel({ defaultWidth: 380, minWidth: 280, maxWidth: 550, storageKey: 'appx-chat-width' });
-  const rightResize = useResizablePanel({ defaultWidth: 280, minWidth: 200, maxWidth: 450, storageKey: 'appx-right-width' });
   const chatWidth = chatResize.width;
-  const rightWidth = rightResize.width;
   const [showDesignSystemPanel, setShowDesignSystemPanel] = useState(false);
   const [progressMessages] = useState<Map<string, unknown>>(new Map());
   const [initialRecommendations, setInitialRecommendations] = useState<{
@@ -356,6 +372,11 @@ export default function ProjectPage() {
   const [showSettings, setShowSettings] = useState(false);
 
   const queryClient = useQueryClient();
+
+  // One-time cleanup of old right panel width from localStorage
+  useEffect(() => {
+    localStorage.removeItem('appx-right-width');
+  }, []);
 
   // ---------- Socket connection ----------
   const {
@@ -379,6 +400,8 @@ export default function ProjectPage() {
     designSystemState,
     generateDesignSystem,
     isProjectJoined,
+    emitEditUndo,
+    onEditUndone,
   } = useProjectSocket(projectId);
 
   // ---------- Thumbnail generation ----------
@@ -650,7 +673,7 @@ export default function ProjectPage() {
   }, [selectedFile, selectedFileId, canEditCode, dirtyFiles, saveFile]);
 
   // Derive tab screens from project files when app/(tabs)/*.tsx files exist
-  const tabScreensFromFiles = useMemo(() => {
+  const _tabScreensFromFiles = useMemo(() => {
     if (!filesMap) return undefined;
     let tabEntries = Object.entries(filesMap)
       .filter(([path]) => /^app\/\(tabs\)\/[^/]+\.tsx?$/.test(path))
@@ -936,7 +959,7 @@ export default function ProjectPage() {
 
     const isNewProjectFromWizard = locationState?.isNewProject === true;
     const initialGenerationDone = project?.initialGenerationCompleted === true;
-    const projectHasNoScreens = !project?.screens || project.screens.length === 0;
+    const _projectHasNoScreens = !project?.screens || project.screens.length === 0;
 
     // Only auto-generate from explicitly approved design system or wizard locationState.
     // NEVER auto-generate from project.designSystem — user must approve via PlanApprovalModal first.
@@ -1249,9 +1272,8 @@ export default function ProjectPage() {
   }, [locationState, project, retryScreen]);
 
   const handleRunOnDevice = useCallback(() => {
-    // Deployment is handled via TestPanel + useDeployment
+    // Deployment handled via useDeployment hook in CanvasHeader
   }, []);
-  const handleExport = useCallback(() => setShowExportModal(true), []);
   const handleSettings = useCallback(() => setShowSettings(true), []);
 
   const handleDesignSystemChange = useCallback(
@@ -1383,16 +1405,11 @@ export default function ProjectPage() {
       <CanvasHeader
         projectId={projectId}
         projectName={project?.name || "Untitled Project"}
-        onExport={handleExport}
-        onDesignSystem={() => setShowDesignSystemPanel(true)}
         onSettings={handleSettings}
-        onPublish={() => setPublishModalOpen(true)}
-        isPublished={project?.isPublic}
         socketConnected={socketConnected}
         socketReconnecting={socketReconnecting}
         socketError={socketError}
         lastSavedAt={project?.updatedAt}
-        publishedUrl={(project as any)?.publishedUrl}
         onDeploymentComplete={() => {
           queryClient.invalidateQueries({ queryKey: ['project', projectId] });
         }}
@@ -1563,6 +1580,8 @@ export default function ProjectPage() {
                 socketChatState={socketChatState}
                 onSocketChatComplete={onChatComplete}
                 onSocketChatError={onChatError}
+                emitEditUndo={emitEditUndo}
+                onEditUndone={onEditUndone}
                 startMultiFileGeneration={startMultiFileGeneration}
                 modifyMultiFile={modifyMultiFile}
                 multiFileState={multiFileState}
@@ -1578,59 +1597,47 @@ export default function ProjectPage() {
 
         <ResizeHandle onMouseDown={chatResize.onMouseDown} direction="right" />
         {/* ============ CENTER PANEL: Preview / Code ============ */}
-        <div className="flex-1 flex flex-col overflow-hidden relative">
+        <div className="flex-1 flex flex-col overflow-hidden relative min-h-0">
           {/* Preview tab */}
           {centerTab === 'preview' && (
-            <>
-              {isRNProject ? (
-                <WebPreview
-                  code={selectedScreen?.reactNativeCode || selectedScreen?.reactCode || selectedScreen?.htmlContent || tabScreensFromFiles?.[0]?.code || null}
-                  screens={tabScreensFromFiles || (screens.length > 1 ? screens.filter(s => s.reactNativeCode || s.reactCode).map(s => ({
-                    name: s.name,
-                    code: (s.reactNativeCode || s.reactCode || '') as string,
-                  })) : undefined)}
-                  files={filesMap}
-                  expoSessionId={null}
-                  expoSessionRevision={null}
-                  onOpenExpo={handleRunOnDevice}
-                  onFixErrors={(msg) => setTriggerMessage(msg)}
-                  isGenerating={selectedScreen?.isLoading}
-                  stageMessage={selectedStreamingState?.stageMessage || selectedStreamingState?.statusMessage}
-                  screenId={selectedScreen?.id}
-                  projectId={projectId}
-                />
-              ) : (
-                <PhonePreviewPanel
-                  screen={selectedScreen || null}
-                  buildStatus={selectedBuildStatus}
-                  streamingHtml={selectedStreamingState?.html}
-                  stageMessage={selectedStreamingState?.stageMessage || selectedStreamingState?.statusMessage}
-                  progressPercent={selectedStreamingState?.progress}
-                  isRNProject={isRNProject}
-                  expoSessionId={null}
-                  onRegenerate={handleRetryScreen}
-                  onRunOnDevice={handleRunOnDevice}
-                  onFixErrors={(msg) => setTriggerMessage(msg)}
-                />
-              )}
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+              <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+                {(
+                  <PhonePreviewPanel
+                    screen={selectedScreen || null}
+                    buildStatus={selectedBuildStatus}
+                    streamingHtml={selectedStreamingState?.html}
+                    stageMessage={selectedStreamingState?.stageMessage || selectedStreamingState?.statusMessage}
+                    progressPercent={selectedStreamingState?.progress}
+                    isRNProject={isRNProject}
+                    expoSessionId={null}
+                    deploymentWebUrl={deploymentWebUrl}
+                    deployRevision={deployment?.deployRevision}
+                    onRegenerate={handleRetryScreen}
+                    onRunOnDevice={handleRunOnDevice}
+                    onFixErrors={(msg) => setTriggerMessage(msg)}
+                  />
+                )}
 
-              {/* Empty state */}
-              {screens.length === 0 && project?.status !== "generating" && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="text-center space-y-4">
-                    <div className="w-16 h-16 rounded-2xl bg-surface-800/50 border border-surface-700/50 flex items-center justify-center mx-auto">
-                      <MessageSquare className="w-7 h-7 text-surface-500" />
-                    </div>
-                    <div className="space-y-2">
-                      <h3 className="text-lg font-semibold text-surface-300">No screens yet</h3>
-                      <p className="text-sm text-surface-500 max-w-xs">
-                        Use the chat to describe screens you want to create.
-                      </p>
+                {/* Empty state — hide if container has a web URL (preview can load from it) */}
+                {screens.length === 0 && project?.status !== "generating" && !deploymentWebUrl && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="text-center space-y-4">
+                      <div className="w-16 h-16 rounded-2xl bg-surface-800/50 border border-surface-700/50 flex items-center justify-center mx-auto">
+                        <MessageSquare className="w-7 h-7 text-surface-500" />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-semibold text-surface-300">No screens yet</h3>
+                        <p className="text-sm text-surface-500 max-w-xs">
+                          Use the chat to describe screens you want to create.
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </>
+                )}
+              </div>
+              <PreviewConsole onFixErrors={(msg) => setTriggerMessage(msg)} />
+            </div>
           )}
 
           {/* Code tab — Rork-style: file tree + editor + floating preview */}
@@ -1735,29 +1742,26 @@ export default function ProjectPage() {
                   </Suspense>
                 </div>
               </div>
-              {/* PiP phone preview — draggable floating overlay, same preview engine as main */}
+              {/* PiP phone preview — draggable floating overlay with live Railover preview */}
               <AnimatePresence>
                 {showCodePreview && (
                   <PiPPreview
                     onClose={() => setShowCodePreview(false)}
                     onRefresh={() => setPipRefreshKey(k => k + 1)}
                   >
-                    <WebPreview
-                      key={pipRefreshKey}
-                      compact
-                      code={selectedScreen?.reactNativeCode || selectedScreen?.reactCode || selectedScreen?.htmlContent || tabScreensFromFiles?.[0]?.code || null}
-                      screens={tabScreensFromFiles || (screens.length > 1 ? screens.filter(s => s.reactNativeCode || s.reactCode).map(s => ({
-                        name: s.name,
-                        code: (s.reactNativeCode || s.reactCode || '') as string,
-                      })) : undefined)}
-                      files={filesMap}
-                      expoSessionId={null}
-                      expoSessionRevision={null}
-                      isGenerating={selectedScreen?.isLoading}
-                      stageMessage={selectedStreamingState?.stageMessage || selectedStreamingState?.statusMessage}
-                      screenId={selectedScreen?.id}
-                      projectId={projectId}
-                    />
+                    {deploymentWebUrl ? (
+                      <iframe
+                        key={`pip-${deploymentWebUrl}-${pipRefreshKey}`}
+                        src={deploymentWebUrl}
+                        className="w-full h-full border-0 bg-white"
+                        title="Live Preview"
+                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-surface-900">
+                        <Loader2 className="w-5 h-5 text-surface-500 animate-spin" />
+                      </div>
+                    )}
                   </PiPPreview>
                 )}
               </AnimatePresence>
@@ -1785,26 +1789,29 @@ export default function ProjectPage() {
 
         {/* Right panel only visible on preview tab */}
         {centerTab === 'preview' && (
-          <>
-            <ResizeHandle onMouseDown={rightResize.onMouseDown} direction="left" />
-            {/* ============ RIGHT PANEL: Test on Phone ============ */}
-            <div style={{ width: rightWidth }} className="flex-shrink-0 border-l border-surface-800/50 flex flex-col">
-              {projectId && (
-                <>
-                  <div className="flex-1 min-h-0">
-                    <TestPanel
-                      projectId={projectId}
-                    />
-                  </div>
-                  <PreviewConsole
-                    sessionId={null}
-                    onFixErrors={(msg) => setTriggerMessage(msg)}
-                    defaultExpanded
-                  />
-                </>
-          )}
-        </div>
-        </>
+          <DeviceTestingSidebar
+            projectId={projectId!}
+            expoUrl={deployment?.expoUrl ?? null}
+            webUrl={deploymentWebUrl ?? null}
+            status={deployment?.status ?? 'none'}
+            errorMessage={deployment?.errorMessage ?? undefined}
+            onProvision={() => provision()}
+            onWake={() => wake()}
+            containerCount={1}
+            maxContainers={PLAN_FEATURES[userPlan].containers}
+            alwaysOn={deployment?.alwaysOn}
+            onToggleAlwaysOn={async (enabled) => {
+              try {
+                await api.patch(`/projects/${projectId}/container/always-on`, { enabled });
+                // Update local state so toggle reflects immediately
+                if (deployment) {
+                  useDeployStore.getState().setDeployment(projectId!, { ...deployment, alwaysOn: enabled });
+                }
+              } catch { /* settings modal handles toast */ }
+            }}
+            isPaidPlan={userPlan === 'pro' || userPlan === 'business'}
+            onOpenSettings={() => setShowSettings(true)}
+          />
         )}
 
         {/* Design System Sidebar (overlay) */}
@@ -1984,6 +1991,8 @@ export default function ProjectPage() {
                     socketChatState={socketChatState}
                     onSocketChatComplete={onChatComplete}
                     onSocketChatError={onChatError}
+                emitEditUndo={emitEditUndo}
+                onEditUndone={onEditUndone}
                     startMultiFileGeneration={startMultiFileGeneration}
                     modifyMultiFile={modifyMultiFile}
                     multiFileState={multiFileState}
@@ -1998,24 +2007,7 @@ export default function ProjectPage() {
           )}
           {mobileTab === 'preview' && (
             <div className="h-full flex items-center justify-center bg-surface-950">
-              {isRNProject ? (
-                <WebPreview
-                  code={selectedScreen?.reactNativeCode || selectedScreen?.reactCode || selectedScreen?.htmlContent || tabScreensFromFiles?.[0]?.code || null}
-                  screens={tabScreensFromFiles || (screens.length > 1 ? screens.filter(s => s.reactNativeCode || s.reactCode).map(s => ({
-                    name: s.name,
-                    code: (s.reactNativeCode || s.reactCode || '') as string,
-                  })) : undefined)}
-                  files={filesMap}
-                  expoSessionId={null}
-                  expoSessionRevision={null}
-                  onOpenExpo={handleRunOnDevice}
-                  onFixErrors={(msg) => setTriggerMessage(msg)}
-                  isGenerating={selectedScreen?.isLoading}
-                  stageMessage={selectedStreamingState?.stageMessage || selectedStreamingState?.statusMessage}
-                  screenId={selectedScreen?.id}
-                  projectId={projectId}
-                />
-              ) : (
+              {(
                 <PhonePreviewPanel
                   screen={selectedScreen || null}
                   buildStatus={selectedBuildStatus}
@@ -2024,6 +2016,8 @@ export default function ProjectPage() {
                   progressPercent={selectedStreamingState?.progress}
                   isRNProject={isRNProject}
                   expoSessionId={null}
+                  deploymentWebUrl={deploymentWebUrl}
+                  deployRevision={deployment?.deployRevision}
                   onRegenerate={handleRetryScreen}
                   onRunOnDevice={handleRunOnDevice}
                   onFixErrors={(msg) => setTriggerMessage(msg)}
@@ -2034,18 +2028,11 @@ export default function ProjectPage() {
           {mobileTab === 'test' && (
             <div className="h-full flex flex-col">
               {projectId && (
-                <>
-                  <div className="flex-1 min-h-0">
-                    <TestPanel
-                      projectId={projectId}
-                    />
-                  </div>
-                  <PreviewConsole
-                    sessionId={null}
-                    onFixErrors={(msg) => setTriggerMessage(msg)}
-                    defaultExpanded
-                  />
-                </>
+                <PreviewConsole
+                  sessionId={null}
+                  onFixErrors={(msg) => setTriggerMessage(msg)}
+                  defaultExpanded
+                />
               )}
             </div>
           )}
@@ -2088,15 +2075,6 @@ export default function ProjectPage() {
 
       {/* ============ MODALS ============ */}
       {projectId && (
-        <ExportModal
-          isOpen={showExportModal}
-          onClose={() => setShowExportModal(false)}
-          projectId={projectId}
-          projectName={project?.name || "Untitled Project"}
-        />
-      )}
-
-      {projectId && (
         <DesignSystemPanel
           isOpen={showDesignSystemPanel}
           onClose={() => setShowDesignSystemPanel(false)}
@@ -2108,24 +2086,7 @@ export default function ProjectPage() {
         />
       )}
 
-      <PublishModal
-        isOpen={publishModalOpen}
-        onClose={() => setPublishModalOpen(false)}
-        projectId={projectId || ""}
-        projectName={project?.name || "Untitled Project"}
-        isPublished={project?.isPublic || false}
-        screens={screens.map(s => ({
-          id: s.id,
-          name: s.name,
-          thumbnailUrl: s.thumbnailUrl,
-          imageUrl: s.imageUrl,
-          htmlContent: s.htmlContent,
-        }))}
-        onPublishSuccess={() => refetch()}
-        onRefreshScreens={async () => { await refetch(); }}
-        slug={project?.slug}
-        onOpenSettings={handleSettings}
-      />
+      {/* PublishModal — coming soon */}
 
       <AnimatePresence>
         {showVersionHistory && selectedScreen && projectId && (

@@ -1,0 +1,220 @@
+{
+  "nav": {
+    "features": "Возможности",
+    "howItWorks": "Как это работает",
+    "pricing": "Тарифы",
+    "signIn": "Войти",
+    "startBuilding": "Начать",
+    "dashboard": "Панель"
+  },
+  "hero": {
+    "badge": "ИИ мобильный инженер",
+    "titleLine1": "Опишите.",
+    "titleLine2": "Мы создадим.",
+    "subtitle1": "Рабочие React Native приложения из одного разговора.",
+    "subtitle2": "Тестируйте на телефоне мгновенно.",
+    "inputPlaceholder": "Опишите мобильное приложение, которое хотите создать..."
+  },
+  "product": {
+    "label": "Что вы получите",
+    "titleLine1": "Не прототип.",
+    "titleLine2": "Реальное приложение.",
+    "description": "AppX генерирует рабочий React Native код — многоэкранные приложения с навигацией, управлением состоянием и потоком данных. Сканируйте QR-код, тестируйте на реальном телефоне. Не макет. Не симулятор."
+  },
+  "features": {
+    "title1": "Всё что нужно",
+    "title2": "для запуска.",
+    "items": {
+      "multiScreen": {
+        "title": "Генерация нескольких экранов",
+        "desc": "Опишите приложение целиком. Получите полный проект с навигацией, управлением состоянием и потоком данных — не просто один экран."
+      },
+      "livePreview": {
+        "title": "Предпросмотр на устройстве",
+        "desc": "Сканируйте QR-код. Тестируйте на телефоне за секунды. Реальное устройство, реальная производительность."
+      },
+      "chatDriven": {
+        "title": "Итерации через чат",
+        "desc": "Улучшайте любой экран через диалог. Меняйте макеты, цвета, логику — как парное программирование с экспертом."
+      },
+      "publish": {
+        "title": "Публикация в один клик",
+        "desc": "Деплойте в веб мгновенно. Экспортируйте в GitHub. Собирайте через EAS. Публикуйте в App Store и Google Play."
+      }
+    }
+  },
+  "howItWorks": {
+    "label": "Как это работает",
+    "describe": {
+      "word": "Опишите",
+      "desc": "Расскажите что хотите создать. Простым языком. Вот и всё."
+    },
+    "generate": {
+      "word": "Генерация",
+      "desc": "ИИ пишет рабочий React Native код. Наблюдайте в реальном времени."
+    },
+    "ship": {
+      "word": "Запуск",
+      "desc": "Тестируйте на телефоне. Пушьте в GitHub. Публикуйте в сторы."
+    }
+  },
+  "statement": {
+    "pre": "От идеи до",
+    "highlight": "App Store",
+    "mid": "за часы,",
+    "end": "не месяцы."
+  },
+  "pricing": {
+    "title": "Простые тарифы",
+    "subtitle": "Начните бесплатно. Обновите когда будете готовы.",
+    "mostPopular": "Популярный",
+    "creditsPerMonth": "кредитов / мес",
+    "free": {
+      "name": "Бесплатный",
+      "cta": "Начать"
+    },
+    "pro": {
+      "name": "Pro",
+      "cta": "Попробовать"
+    },
+    "business": {
+      "name": "Business",
+      "cta": "Попробовать"
+    },
+    "features": {
+      "projects": "{{count}} проект | {{count}} проекта | {{count}} проектов",
+      "containers": "{{count}} контейнер | {{count}} контейнера | {{count}} контейнеров",
+      "dailyGenerations": "{{count}} генераций в день",
+      "unlimitedGenerations": "Безлимитные генерации",
+      "unlimitedEverything": "Всё безлимитно",
+      "webPreview": "Веб-превью",
+      "devicePreview": "Превью на устройстве",
+      "customDomain": "Свой домен",
+      "codeExport": "Экспорт кода",
+      "githubIntegration": "Интеграция с GitHub",
+      "alwaysOnContainers": "Контейнеры 24/7",
+      "communitySupport": "Поддержка сообщества",
+      "prioritySupport": "Приоритетная поддержка",
+      "dedicatedSupport": "Выделенная поддержка"
+    }
+  },
+  "cta": {
+    "title1": "Ваше следующее приложение",
+    "title2": "начинается с одного сообщения.",
+    "button": "Начать бесплатно"
+  },
+  "footer": {
+    "tagline": "ИИ платформа для создания мобильных приложений.",
+    "product": "Продукт",
+    "developers": "Разработчикам",
+    "company": "Компания",
+    "legal": "Правовая информация",
+    "documentation": "Документация",
+    "apiReference": "API справочник",
+    "status": "Статус",
+    "about": "О нас",
+    "blog": "Блог",
+    "contact": "Контакты",
+    "changelog": "Журнал изменений",
+    "terms": "Условия",
+    "privacy": "Конфиденциальность"
+  },
+  "composer": {
+    "placeholder": "Опишите мобильное приложение, которое хотите создать...",
+    "examples": {
+      "fitness": "Фитнес-трекер с тренировками и графиками",
+      "delivery": "Доставка еды с отслеживанием",
+      "meditation": "Приложение для медитации"
+    }
+  },
+  "dashboard": {
+    "title": "Панель управления",
+    "buildYourApp": "Создайте приложение",
+    "description": "Опишите приложение и ИИ создаст его за минуты",
+    "yourProjects": "Ваши проекты",
+    "projectCount": "{{count}} проектов",
+    "newProject": "Новый проект",
+    "lastEdited": "Изменён",
+    "screens": "{{count}} экранов",
+    "draft": "Черновик",
+    "published": "Опубликован",
+    "noProjects": "Проектов пока нет",
+    "createFirst": "Создайте первое приложение, описав его выше"
+  },
+  "canvas": {
+    "aiChat": "ИИ чат",
+    "preview": "Превью",
+    "code": "Код",
+    "publish": "Опубликовать",
+    "publishing": "Публикация...",
+    "published": "Опубликовано",
+    "noScreens": "Экранов пока нет",
+    "useChat": "Используйте чат чтобы описать экраны.",
+    "console": "Консоль",
+    "expand": "Развернуть",
+    "collapse": "Свернуть",
+    "fixWithAI": "Исправить с ИИ",
+    "clear": "Очистить",
+    "errors": "{{count}} ошибка | {{count}} ошибки | {{count}} ошибок",
+    "deviceTesting": "Тестирование",
+    "testOnPhone": "Тест на телефоне",
+    "scanQR": "Сканируйте QR для теста",
+    "deployToTest": "Деплой для теста",
+    "containersUsed": "{{used}}/{{max}} контейнеров",
+    "containerLimit": "Лимит контейнеров достигнут",
+    "upgradePlan": "Улучшить тариф",
+    "manageContainers": "Управление контейнерами"
+  },
+  "settings": {
+    "appIdentity": "Идентификация",
+    "projectName": "Название проекта",
+    "urlIdentifiers": "URL и идентификаторы",
+    "appIcon": "Иконка",
+    "envVars": "Переменные окружения",
+    "apiDocs": "API документация",
+    "container": "Контейнер / Песочница",
+    "status": "Статус",
+    "liveUrl": "URL приложения",
+    "expoUrl": "Expo URL",
+    "subdomain": "Поддомен",
+    "memory": "Память",
+    "deploys": "Деплои",
+    "alwaysOn": "Не выключать",
+    "alwaysOnCost": "5 кредитов/день",
+    "customSubdomain": "Свой поддомен",
+    "customDomain": "Свой домен",
+    "addDomain": "Добавить домен",
+    "verifyDns": "Проверить DNS",
+    "removeDomain": "Удалить",
+    "dangerZone": "Опасная зона",
+    "deleteProject": "Удалить проект",
+    "save": "Сохранить",
+    "cancel": "Отмена"
+  },
+  "auth": {
+    "welcomeTo": "Добро пожаловать в AppX",
+    "signInContinue": "Войдите чтобы продолжить",
+    "continueWithGoogle": "Войти через Google",
+    "or": "или",
+    "email": "Эл. почта",
+    "password": "Пароль",
+    "signInWithEmail": "Войти с почтой",
+    "createAccount": "Создать аккаунт",
+    "alreadyHaveAccount": "Уже есть аккаунт?",
+    "dontHaveAccount": "Нет аккаунта?"
+  },
+  "common": {
+    "loading": "Загрузка",
+    "pleaseWait": "Подождите...",
+    "error": "Ошибка",
+    "retry": "Повторить",
+    "copied": "Скопировано!",
+    "urlCopied": "URL скопирован!",
+    "proRequired": "Нужен Pro тариф"
+  },
+  "language": {
+    "en": "English",
+    "ru": "Русский",
+    "uz": "O'zbek"
+  }
+}

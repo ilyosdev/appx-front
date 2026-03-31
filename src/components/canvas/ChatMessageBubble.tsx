@@ -43,6 +43,8 @@ interface ChatMessageBubbleProps {
   isPlanImplementing?: boolean;
   /** Called when user wants to refine a plan */
   onRefinePlan?: (planId: string, feedback: string) => void;
+  /** Called when user clicks Undo on an edit summary */
+  onUndoEdit?: (screenId: string, versionId: string) => void;
 }
 
 export function ChatMessageBubble({
@@ -60,6 +62,7 @@ export function ChatMessageBubble({
   onConfirmPlan,
   isPlanImplementing,
   onRefinePlan,
+  onUndoEdit,
 }: ChatMessageBubbleProps) {
   // Skip progress messages - they are now shown in the floating bubble
   if (message.metadata?.type === "progress") {
@@ -511,6 +514,17 @@ export function ChatMessageBubble({
           {!isUser && message.metadata?.changeSummary && (
             <EditSummaryCard
               changes={message.metadata.changeSummary as string[]}
+              screenId={message.metadata?.editedScreenId as string | undefined}
+              previousVersionId={message.metadata?.previousVersionId as string | undefined}
+              isUndone={!!message.metadata?.editUndone}
+              onUndo={
+                message.metadata?.editedScreenId && message.metadata?.previousVersionId && onUndoEdit
+                  ? () => onUndoEdit(
+                      message.metadata!.editedScreenId as string,
+                      message.metadata!.previousVersionId as string,
+                    )
+                  : undefined
+              }
             />
           )}
           {/* Plan mode: confirm & implement buttons */}

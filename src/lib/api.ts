@@ -135,9 +135,15 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       const refreshToken = tokenStorage.getRefreshToken();
 
+      // Public pages should not redirect to login on 401
+      const publicPaths = ['/', '/login', '/register', '/pricing', '/terms', '/privacy', '/gallery'];
+      const isPublicPage = publicPaths.includes(window.location.pathname) || window.location.pathname.startsWith('/p/') || window.location.pathname.startsWith('/app/');
+
       if (!refreshToken) {
         tokenStorage.clearTokens();
-        window.location.href = "/login";
+        if (!isPublicPage) {
+          window.location.href = "/login";
+        }
         return Promise.reject(error);
       }
 
@@ -179,7 +185,9 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError as Error, null);
         tokenStorage.clearTokens();
-        window.location.href = "/login";
+        if (!isPublicPage) {
+          window.location.href = "/login";
+        }
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

@@ -20,6 +20,7 @@ const AuthCallback = lazy(() => import('./pages/AuthCallback'));
 const Gallery = lazy(() => import('./pages/Gallery'));
 const CodeStudio = lazy(() => import('./pages/CodeStudio'));
 const PublicProject = lazy(() => import('./pages/PublicProject'));
+const PreviewLanding = lazy(() => import('./pages/PreviewLanding'));
 const PublishedAppPage = lazy(() => import('./pages/PublishedAppPage'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
@@ -69,6 +70,7 @@ function App() {
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/gallery" element={<Gallery />} />
                   <Route path="/p/:projectId" element={<PublicProject />} />
+                  <Route path="/preview/:projectId" element={<PreviewLanding />} />
                   <Route path="/app/:slug" element={<PublishedAppPage />} />
                   <Route path="/auth/callback" element={<AuthCallback />} />
 

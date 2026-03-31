@@ -2,35 +2,24 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
-  Download,
-  Sparkles,
   Settings,
-  Smartphone,
   Loader2,
-  Palette,
-  Coins,
-  Globe,
-  Check,
-  Rocket,
-  Send,
   Code2,
   Eye,
-  Crown,
+  ChevronDown,
+  Trash2,
+  Rocket,
+  Check,
 } from "lucide-react";
-import { useAuthStore } from "@/stores/authStore";
-import { useBillingStore } from "@/stores/billingStore";
-import { PLAN_FEATURES } from "@/lib/payments";
-import type { PlanType } from "@/lib/payments";
 import { useDeployment } from "@/hooks/useDeployment";
 import { cn } from "@/lib/utils";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { InviteModal } from "@/components/collaboration/InviteModal";
 import { AccessBadge } from "@/components/collaboration/AccessBadge";
-import { ShareButton } from "./ShareButton";
 import { PresenceIndicator } from "./PresenceIndicator";
 import { GitHubButton } from "./GitHubButton";
 
-// Keep ConnectionIndicator export for backward compat (used nowhere after refactor, but safe)
+// ConnectionIndicator — always visible dot
 interface ConnectionIndicatorProps {
   isConnected: boolean;
   isReconnecting: boolean;
@@ -44,50 +33,34 @@ export function ConnectionIndicator({
 }: ConnectionIndicatorProps) {
   if (isReconnecting) {
     return (
-      <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+      <div className="flex items-center" title="Reconnecting...">
         <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
-        <span className="text-xs text-yellow-400">Reconnecting...</span>
       </div>
     );
   }
 
   if (error || !isConnected) {
     return (
-      <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/20">
+      <div className="flex items-center" title={error || "Disconnected"}>
         <div className="w-2 h-2 rounded-full bg-red-400" />
-        <span className="text-xs text-red-400">Offline</span>
       </div>
     );
   }
 
-  // When connected, render nothing (clean header)
-  return null;
-}
-
-function formatRelativeTime(dateStr?: string): string {
-  if (!dateStr) return "Not saved yet";
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffSec / 60);
-  const diffHr = Math.floor(diffMin / 60);
-  const diffDays = Math.floor(diffHr / 24);
-
-  if (diffSec < 60) return "Just now";
-  if (diffMin < 60)
-    return `${diffMin} minute${diffMin !== 1 ? "s" : ""} ago`;
-  if (diffHr < 24) return `${diffHr} hour${diffHr !== 1 ? "s" : ""} ago`;
-  return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
+  // Connected: green dot
+  return (
+    <div className="flex items-center" title="Connected">
+      <div className="w-2 h-2 rounded-full bg-emerald-400" />
+    </div>
+  );
 }
 
 interface CanvasHeaderProps {
   projectId?: string;
   projectName: string;
-  onExport: () => void;
-  onDesignSystem: () => void;
+  onExport?: () => void;
   onSettings: () => void;
-  onPublish: () => void;
+  onPublish?: () => void;
   isPublished?: boolean;
   lastSavedAt?: string;
   socketConnected?: boolean;
@@ -96,62 +69,50 @@ interface CanvasHeaderProps {
   publishedUrl?: string | null;
   onDeploymentComplete?: (url: string) => void;
   /** Active center panel tab */
-  centerTab?: 'preview' | 'code';
+  centerTab?: "preview" | "code";
   /** Callback to switch center panel tab */
-  onCenterTabChange?: (tab: 'preview' | 'code') => void;
+  onCenterTabChange?: (tab: "preview" | "code") => void;
 }
 
 export function CanvasHeader({
   projectId,
   projectName,
-  onExport,
-  onDesignSystem,
   onSettings,
-  onPublish,
-  isPublished,
-  lastSavedAt,
   socketConnected,
   socketReconnecting,
   socketError,
-  centerTab = 'preview',
+  centerTab = "preview",
   onCenterTabChange,
 }: CanvasHeaderProps) {
   const navigate = useNavigate();
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  const projectMenuRef = useRef<HTMLDivElement>(null);
 
-  // Plan gating
-  const { user } = useAuthStore();
-  const { openUpgradeModal } = useBillingStore();
-  const userPlan = (user?.plan as PlanType) || 'free';
-  const canEditCode = PLAN_FEATURES[userPlan].codeExport;
-
-  // Close dropdown when clicking outside
+  // Close project menu when clicking outside
   useEffect(() => {
-    if (!settingsOpen) return;
+    if (!projectMenuOpen) return;
     const handleClick = (e: MouseEvent) => {
       if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
+        projectMenuRef.current &&
+        !projectMenuRef.current.contains(e.target as Node)
       ) {
-        setSettingsOpen(false);
+        setProjectMenuOpen(false);
       }
     };
     document.addEventListener("click", handleClick);
     return () => document.removeEventListener("click", handleClick);
-  }, [settingsOpen]);
+  }, [projectMenuOpen]);
 
   // Deployment status
-  const { deployment, status: deployStatus, provision } = useDeployment(projectId);
-  const deployStatusConfig: Record<string, { color: string; pulse?: boolean; label: string }> = {
-    provisioning: { color: 'bg-yellow-400', pulse: true, label: 'Provisioning' },
-    warm: { color: 'bg-blue-400', label: 'Ready' },
-    deploying: { color: 'bg-yellow-400', pulse: true, label: 'Deploying' },
-    running: { color: 'bg-emerald-400', label: 'Live' },
-    sleeping: { color: 'bg-gray-400', label: 'Sleeping' },
-    error: { color: 'bg-red-400', label: 'Error' },
-  };
-  const deployCfg = deployStatusConfig[deployStatus];
+  const {
+    deployment,
+    status: deployStatus,
+    provision,
+  } = useDeployment(projectId);
+
+  const isDeploying =
+    deployStatus === "provisioning" || deployStatus === "deploying";
+  const isLive = deployStatus === "running";
 
   // Collaboration
   const {
@@ -171,36 +132,66 @@ export function CanvasHeader({
 
   return (
     <>
-      <header className="h-14 flex items-center justify-between px-4 border-b border-surface-800/50 bg-surface-950/80 backdrop-blur-xl flex-shrink-0 relative z-20">
-        {/* Left: Back + Project name + Access badge */}
-        <div className="flex items-center gap-3">
+      <header className="h-12 flex items-center justify-between px-3 border-b border-surface-800/50 bg-surface-950/80 backdrop-blur-xl flex-shrink-0 relative z-20">
+        {/* Left: Back + Project name + dropdown caret + connection dot + presence */}
+        <div className="flex items-center gap-2">
           <Link
             to="/dashboard"
-            className="p-2 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800 transition-colors"
+            className="p-1.5 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800 transition-colors"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" />
           </Link>
 
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-sm font-semibold text-white truncate max-w-[120px] md:max-w-none">
-                  {projectName}
-                </h1>
-                {myAccessLevel && myAccessLevel !== "none" && (
-                  <AccessBadge role={myAccessLevel} size="sm" />
-                )}
+          {/* Project name with dropdown */}
+          <div className="relative" ref={projectMenuRef}>
+            <button
+              onClick={() => setProjectMenuOpen(!projectMenuOpen)}
+              className="flex items-center gap-1 px-1.5 py-1 rounded-lg hover:bg-surface-800/50 transition-colors"
+            >
+              <h1 className="text-sm font-semibold text-white truncate max-w-[140px] md:max-w-[200px]">
+                {projectName}
+              </h1>
+              <ChevronDown className="w-3.5 h-3.5 text-surface-400" />
+            </button>
+
+            {projectMenuOpen && (
+              <div className="absolute left-0 top-full mt-1 w-48 bg-surface-900 border border-surface-700/50 rounded-xl shadow-2xl shadow-black/40 py-1 z-50">
+                <button
+                  onClick={() => {
+                    onSettings();
+                    setProjectMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-surface-300 hover:text-white hover:bg-surface-800/50 transition-colors text-left"
+                >
+                  <Settings className="w-4 h-4 text-surface-500" />
+                  <span>Settings</span>
+                </button>
+                <div className="my-1 h-px bg-surface-800/50" />
+                <button
+                  onClick={() => {
+                    setProjectMenuOpen(false);
+                    if (
+                      window.confirm(
+                        "Are you sure you want to delete this project? This action cannot be undone.",
+                      )
+                    ) {
+                      navigate("/dashboard");
+                    }
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-surface-800/50 transition-colors text-left"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Delete</span>
+                </button>
               </div>
-              <p className="text-xs text-surface-500 hidden md:block">
-                Last saved {formatRelativeTime(lastSavedAt)}
-              </p>
-            </div>
+            )}
           </div>
 
-          {/* Disconnected indicator -- only show when NOT connected */}
+          {myAccessLevel && myAccessLevel !== "none" && (
+            <AccessBadge role={myAccessLevel} size="sm" />
+          )}
+
+          {/* Connection indicator — always visible */}
           {socketConnected !== undefined && (
             <ConnectionIndicator
               isConnected={socketConnected}
@@ -215,208 +206,81 @@ export function CanvasHeader({
           </div>
         </div>
 
-        {/* Center: Preview / Code / Files tabs */}
-        <div className="hidden md:flex items-center gap-0.5 bg-surface-800/40 rounded-lg p-0.5">
+        {/* Center: Preview / Code pill tabs */}
+        <div className="hidden md:flex gap-0.5 bg-surface-900 rounded-[10px] p-[3px]">
           <button
-            onClick={() => onCenterTabChange?.('preview')}
+            onClick={() => onCenterTabChange?.("preview")}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-              centerTab === 'preview'
-                ? "bg-surface-700/60 text-white"
-                : "text-surface-400 hover:text-white hover:bg-surface-700/50",
+              "flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors",
+              centerTab === "preview"
+                ? "bg-surface-700 text-white"
+                : "text-surface-400 hover:text-surface-300",
             )}
           >
-            <Eye className="w-3.5 h-3.5" />
-            Web Preview
+            <Eye className="w-3.5 h-3.5" /> Preview
           </button>
           <button
-            onClick={() => {
-              if (!canEditCode) {
-                openUpgradeModal('exports', 'Upgrade to access the code editor.');
-                return;
-              }
-              onCenterTabChange?.('code');
-            }}
+            onClick={() => onCenterTabChange?.("code")}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-              centerTab === 'code'
-                ? "bg-surface-700/60 text-white"
-                : "text-surface-400 hover:text-white hover:bg-surface-700/50",
+              "flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors",
+              centerTab === "code"
+                ? "bg-surface-700 text-white"
+                : "text-surface-400 hover:text-surface-300",
             )}
           >
-            <Code2 className="w-3.5 h-3.5" />
-            Code
-            {!canEditCode && <Crown className="w-3 h-3 text-cyan-400" />}
+            <Code2 className="w-3.5 h-3.5" /> Code
           </button>
         </div>
 
-        {/* Right: GitHub + Share + Run on Device + Export + Settings */}
+        {/* Right: GitHub + Publish + Settings gear */}
         <div className="flex items-center gap-2">
           {/* GitHub integration -- hidden on mobile */}
           <div className="hidden md:block">
             {projectId && <GitHubButton projectId={projectId} />}
           </div>
 
-          {/* Share button with collaborator dropdown -- hidden on mobile */}
-          <div className="hidden md:block">
-            <ShareButton
-              collaboratorCount={acceptedCollaborators.length}
-              collaborators={collaborators}
-              owner={owner}
-              onInvite={openInviteModal}
-            />
-          </div>
-
-          {/* Deploy status pill */}
-          {deployCfg && (
-            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-800/50 border border-surface-700/50">
-              <div className={cn("w-2 h-2 rounded-full", deployCfg.color, deployCfg.pulse && "animate-pulse")} />
-              <span className="text-xs text-surface-300">{deployCfg.label}</span>
-            </div>
-          )}
-
-          {/* Run on Device -- deploy CTA */}
+          {/* Publish button */}
           <button
             onClick={() => {
-              if (deployStatus === 'none' || deployStatus === 'error') {
+              if (!isDeploying && !isLive) {
                 provision();
               }
-              // If already running/deploying, the status pill shows state
             }}
+            disabled={isDeploying}
             className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-lg",
-              deployStatus === 'running'
-                ? "bg-emerald-500 text-white hover:bg-emerald-400 shadow-emerald-500/20"
-                : deployStatus === 'provisioning' || deployStatus === 'deploying'
-                  ? "bg-yellow-500 text-white hover:bg-yellow-400 shadow-yellow-500/20"
-                  : "bg-primary-500 text-white hover:bg-primary-400 shadow-primary-500/20",
+              "flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors",
+              isLive
+                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25"
+                : isDeploying
+                  ? "bg-surface-800 text-surface-400 border border-surface-700/50 cursor-wait"
+                  : "bg-primary-500 text-white hover:bg-primary-400",
             )}
           >
-            {(deployStatus === 'provisioning' || deployStatus === 'deploying') ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+            {isDeploying ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : isLive ? (
+              <Check className="w-3.5 h-3.5" />
             ) : (
-              <div className="relative">
-                <Smartphone className="w-4 h-4" />
-                {deployStatus === 'running' && (
-                  <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-white animate-pulse" />
-                )}
-              </div>
+              <Rocket className="w-3.5 h-3.5" />
             )}
             <span className="hidden md:inline">
-              {deployStatus === 'provisioning'
-                ? "Provisioning..."
-                : deployStatus === 'deploying'
-                  ? "Deploying..."
-                  : deployStatus === 'running'
-                    ? "Live on Device"
-                    : "Run on Device"}
+              {deployStatus === "provisioning"
+                ? "Publishing..."
+                : deployStatus === "deploying"
+                  ? "Publishing..."
+                  : isLive
+                    ? "Published"
+                    : "Publish"}
             </span>
           </button>
 
-          {/* Export -- hidden on mobile */}
+          {/* Settings gear — opens settings drawer directly */}
           <button
-            onClick={() => {
-              if (!canEditCode) {
-                openUpgradeModal('exports', 'Upgrade to export your code.');
-                return;
-              }
-              onExport();
-            }}
-            className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-800/50 border border-surface-700/50 text-surface-300 hover:text-white hover:bg-surface-800 transition-colors text-sm font-medium"
+            onClick={() => onSettings()}
+            className="p-1.5 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800 transition-colors"
           >
-            <Download className="w-4 h-4" />
-            Export
-            {!canEditCode && <Crown className="w-3.5 h-3.5 text-cyan-400" />}
+            <Settings className="w-4 h-4" />
           </button>
-
-          {/* Settings dropdown */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setSettingsOpen(!settingsOpen)}
-              className={cn(
-                "p-2 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800 transition-colors",
-                settingsOpen && "bg-surface-800 text-white",
-              )}
-            >
-              <Settings className="w-5 h-5" />
-            </button>
-
-            {settingsOpen && (
-              <div className="absolute right-0 top-full mt-1 w-52 bg-surface-900 border border-surface-700/50 rounded-xl shadow-2xl shadow-black/40 py-1 z-50">
-                <DropdownItem
-                  icon={Palette}
-                  label="Design System"
-                  onClick={() => {
-                    onDesignSystem();
-                    setSettingsOpen(false);
-                  }}
-                />
-                <DropdownItem
-                  icon={Coins}
-                  label="Credits"
-                  onClick={() => {
-                    // Open credits via billing store
-                    const { user } = useAuthStore.getState();
-                    const userPlan = (user?.plan as PlanType) || "free";
-                    const canPurchase =
-                      PLAN_FEATURES[userPlan].canPurchaseCredits;
-                    if (canPurchase) {
-                      useBillingStore.getState().openCreditModal();
-                    } else {
-                      useBillingStore
-                        .getState()
-                        .openUpgradeModal(
-                          "credits",
-                          "Upgrade to get more credits and unlock credit purchases.",
-                        );
-                    }
-                    setSettingsOpen(false);
-                  }}
-                />
-                <DropdownItem
-                  icon={isPublished ? Check : Globe}
-                  label={isPublished ? "Published" : "Publish"}
-                  onClick={() => {
-                    onPublish();
-                    setSettingsOpen(false);
-                  }}
-                  accent={isPublished ? "emerald" : undefined}
-                />
-
-                <div className="my-1 h-px bg-surface-800/50" />
-
-                <DropdownItem
-                  icon={Rocket}
-                  label="Deploy"
-                  onClick={() => {
-                    // DeployButton used to be inline; now accessible via settings.
-                    // For now, open the settings modal which contains deploy.
-                    onSettings();
-                    setSettingsOpen(false);
-                  }}
-                />
-                <DropdownItem
-                  icon={Send}
-                  label="Submit to Dev"
-                  onClick={() => {
-                    onSettings();
-                    setSettingsOpen(false);
-                  }}
-                />
-
-                <div className="my-1 h-px bg-surface-800/50" />
-
-                <DropdownItem
-                  icon={Settings}
-                  label="Project Settings"
-                  onClick={() => {
-                    onSettings();
-                    setSettingsOpen(false);
-                  }}
-                />
-              </div>
-            )}
-          </div>
         </div>
       </header>
 
@@ -431,37 +295,3 @@ export function CanvasHeader({
   );
 }
 
-function DropdownItem({
-  icon: Icon,
-  label,
-  onClick,
-  accent,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  onClick: () => void;
-  accent?: "emerald";
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="w-full flex items-center gap-3 px-3 py-2 text-sm text-surface-300 hover:text-white hover:bg-surface-800/50 transition-colors text-left"
-    >
-      <Icon
-        className={cn(
-          "w-4 h-4",
-          accent === "emerald" ? "text-emerald-400" : "text-surface-500",
-        )}
-      />
-      <span
-        className={cn(
-          accent === "emerald" && "text-emerald-400",
-        )}
-      >
-        {label}
-      </span>
-    </button>
-  );
-}
-
-// CanvasCreditBadge removed from header -- credits now in Settings dropdown

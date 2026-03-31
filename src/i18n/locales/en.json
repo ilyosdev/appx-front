@@ -1,0 +1,220 @@
+{
+  "nav": {
+    "features": "Features",
+    "howItWorks": "How it works",
+    "pricing": "Pricing",
+    "signIn": "Sign in",
+    "startBuilding": "Start Building",
+    "dashboard": "Dashboard"
+  },
+  "hero": {
+    "badge": "The AI Mobile Engineer",
+    "titleLine1": "Describe it.",
+    "titleLine2": "We build it.",
+    "subtitle1": "Production React Native apps from a single conversation.",
+    "subtitle2": "Test on your phone instantly.",
+    "inputPlaceholder": "Describe the mobile app you want to build..."
+  },
+  "product": {
+    "label": "What you get",
+    "titleLine1": "Not a prototype.",
+    "titleLine2": "A real app.",
+    "description": "AppX generates production React Native code — multi-screen apps with navigation, state management, and data flow. Scan a QR code, test on your actual phone. Not a mockup. Not a simulator."
+  },
+  "features": {
+    "title1": "Everything you need",
+    "title2": "to ship.",
+    "items": {
+      "multiScreen": {
+        "title": "Multi-Screen Generation",
+        "desc": "Describe an entire app. Get a complete project with navigation, state management, and data flow — not just a single screen."
+      },
+      "livePreview": {
+        "title": "Live Device Preview",
+        "desc": "Scan a QR code. Test on your phone in seconds. Real device, real performance, real haptics. No simulator."
+      },
+      "chatDriven": {
+        "title": "Chat-Driven Iteration",
+        "desc": "Refine any screen conversationally. Change layouts, colors, logic — like pair-programming with a senior engineer."
+      },
+      "publish": {
+        "title": "One-Click Publish",
+        "desc": "Deploy to the web instantly. Export to GitHub. Build with EAS. Ship to the App Store and Google Play."
+      }
+    }
+  },
+  "howItWorks": {
+    "label": "How it works",
+    "describe": {
+      "word": "Describe",
+      "desc": "Tell us what you want to build. In plain English. That's it."
+    },
+    "generate": {
+      "word": "Generate",
+      "desc": "AI writes production React Native code. Watch it happen in real time."
+    },
+    "ship": {
+      "word": "Ship",
+      "desc": "Test on your phone. Push to GitHub. Publish to app stores."
+    }
+  },
+  "statement": {
+    "pre": "From idea to",
+    "highlight": "App Store",
+    "mid": "in hours,",
+    "end": "not months."
+  },
+  "pricing": {
+    "title": "Simple pricing",
+    "subtitle": "Start free. Upgrade when you're ready.",
+    "mostPopular": "Most Popular",
+    "creditsPerMonth": "credits / month",
+    "free": {
+      "name": "Free",
+      "cta": "Get Started"
+    },
+    "pro": {
+      "name": "Pro",
+      "cta": "Start Free Trial"
+    },
+    "business": {
+      "name": "Business",
+      "cta": "Start Free Trial"
+    },
+    "features": {
+      "projects": "{{count}} project | {{count}} projects",
+      "containers": "{{count}} container | {{count}} containers",
+      "dailyGenerations": "{{count}} daily generations",
+      "unlimitedGenerations": "Unlimited generations",
+      "unlimitedEverything": "Unlimited everything",
+      "webPreview": "Web preview",
+      "devicePreview": "Device preview",
+      "customDomain": "Custom domain",
+      "codeExport": "Code export",
+      "githubIntegration": "GitHub integration",
+      "alwaysOnContainers": "Always-on containers",
+      "communitySupport": "Community support",
+      "prioritySupport": "Priority support",
+      "dedicatedSupport": "Dedicated support"
+    }
+  },
+  "cta": {
+    "title1": "Your next app starts",
+    "title2": "with one message.",
+    "button": "Start Building Free"
+  },
+  "footer": {
+    "tagline": "The AI platform for shipping mobile apps.",
+    "product": "Product",
+    "developers": "Developers",
+    "company": "Company",
+    "legal": "Legal",
+    "documentation": "Documentation",
+    "apiReference": "API Reference",
+    "status": "Status",
+    "about": "About",
+    "blog": "Blog",
+    "contact": "Contact",
+    "changelog": "Changelog",
+    "terms": "Terms",
+    "privacy": "Privacy"
+  },
+  "composer": {
+    "placeholder": "Describe the mobile app you want to build...",
+    "examples": {
+      "fitness": "Fitness tracker with workouts & charts",
+      "delivery": "Food delivery with live tracking",
+      "meditation": "Meditation app with streaks"
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "buildYourApp": "Build your app",
+    "description": "Describe the app you want and AI builds it in minutes",
+    "yourProjects": "Your projects",
+    "projectCount": "{{count}} projects",
+    "newProject": "New Project",
+    "lastEdited": "Last edited",
+    "screens": "{{count}} screens",
+    "draft": "Draft",
+    "published": "Published",
+    "noProjects": "No projects yet",
+    "createFirst": "Create your first app by describing it above"
+  },
+  "canvas": {
+    "aiChat": "AI Chat",
+    "preview": "Preview",
+    "code": "Code",
+    "publish": "Publish",
+    "publishing": "Publishing...",
+    "published": "Published",
+    "noScreens": "No screens yet",
+    "useChat": "Use the chat to describe screens you want to create.",
+    "console": "Console",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "fixWithAI": "Fix with AI",
+    "clear": "Clear",
+    "errors": "{{count}} error | {{count}} errors",
+    "deviceTesting": "Device Testing",
+    "testOnPhone": "Test on your phone",
+    "scanQR": "Scan QR code to test",
+    "deployToTest": "Deploy to test on device",
+    "containersUsed": "{{used}}/{{max}} containers",
+    "containerLimit": "Container limit reached",
+    "upgradePlan": "Upgrade Plan",
+    "manageContainers": "Manage Containers"
+  },
+  "settings": {
+    "appIdentity": "App Identity",
+    "projectName": "Project Name",
+    "urlIdentifiers": "URL & Identifiers",
+    "appIcon": "App Icon",
+    "envVars": "Environment Variables",
+    "apiDocs": "API Documentation",
+    "container": "Container / Sandbox",
+    "status": "Status",
+    "liveUrl": "Live URL",
+    "expoUrl": "Expo URL",
+    "subdomain": "Subdomain",
+    "memory": "Memory",
+    "deploys": "Deploys",
+    "alwaysOn": "Keep alive",
+    "alwaysOnCost": "5 credits/day",
+    "customSubdomain": "Custom Subdomain",
+    "customDomain": "Custom Domain",
+    "addDomain": "Add Domain",
+    "verifyDns": "Verify DNS",
+    "removeDomain": "Remove",
+    "dangerZone": "Danger Zone",
+    "deleteProject": "Delete Project",
+    "save": "Save Changes",
+    "cancel": "Cancel"
+  },
+  "auth": {
+    "welcomeTo": "Welcome to AppX",
+    "signInContinue": "Sign in to continue",
+    "continueWithGoogle": "Continue with Google",
+    "or": "or",
+    "email": "Email",
+    "password": "Password",
+    "signInWithEmail": "Sign in with email",
+    "createAccount": "Create account",
+    "alreadyHaveAccount": "Already have an account?",
+    "dontHaveAccount": "Don't have an account?"
+  },
+  "common": {
+    "loading": "Loading",
+    "pleaseWait": "Please wait...",
+    "error": "Error",
+    "retry": "Retry",
+    "copied": "Copied!",
+    "urlCopied": "URL copied!",
+    "proRequired": "Pro plan required"
+  },
+  "language": {
+    "en": "English",
+    "ru": "Русский",
+    "uz": "O'zbek"
+  }
+}

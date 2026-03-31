@@ -276,6 +276,9 @@ export const projectsApi = {
   exportCode: (projectId: string) =>
     api.get(`/projects/${projectId}/export?format=react`, { responseType: 'blob' }),
 
+  exportSourceCode: (projectId: string) =>
+    api.get(`/projects/${projectId}/export/source`, { responseType: 'blob' }),
+
   checkSlugAvailability: async (slug: string, excludeProjectId?: string) => {
     const params = excludeProjectId ? { excludeProjectId } : {};
     const response = await api.get(`/projects/slug/check/${slug}`, { params });
@@ -343,5 +346,26 @@ export const projectsApi = {
   },
   deleteEnvVar: async (projectId: string, varId: string) => {
     await api.delete(`/projects/${projectId}/env-vars/${varId}`);
+  },
+  detectEnvVars: async (projectId: string) => {
+    const { data } = await api.get(`/projects/${projectId}/env-vars/detect`);
+    return (data.data ?? data) as {
+      detected: Array<{ key: string; configured: boolean; file: string }>;
+      suggestions: Array<{ key: string; description: string }>;
+    };
+  },
+  pushEnvVars: async (projectId: string) => {
+    const { data } = await api.post(`/projects/${projectId}/env-vars/push`);
+    return (data.data ?? data) as { pushed: number; keys: string[] };
+  },
+
+  // Instance scaling
+  scaleContainer: async (projectId: string, instances: 0 | 1) => {
+    const { data } = await api.patch(`/projects/${projectId}/container/scale`, { instances });
+    return (data.data ?? data) as {
+      desiredInstances: number;
+      actualInstances: number;
+      status: string;
+    };
   },
 };

@@ -10,6 +10,8 @@ export type DeploymentStatus =
   | 'error'
   | 'destroyed';
 
+export type ScaleMode = 'auto' | 'always_on' | 'manual';
+
 export interface Deployment {
   id?: string;
   projectId: string;
@@ -22,6 +24,18 @@ export interface Deployment {
   lastDeployedAt?: string | null;
   lastActivityAt?: string | null;
   memoryMb?: number;
+  alwaysOn?: boolean;
+  customDomain?: string | null;
+  customDomainStatus?: 'pending' | 'active' | 'failed';
+  subdomain?: string | null;
+  /** Incremented each time new code is pushed — triggers iframe refresh */
+  deployRevision?: number;
+  /** Desired number of instances (0 = sleeping, 1 = running) */
+  desiredInstances?: number;
+  /** Actual number of running instances */
+  actualInstances?: number;
+  /** Scale mode: auto (sleep after idle), always_on, or manual */
+  scaleMode?: ScaleMode;
 }
 
 interface DeployState {
@@ -29,6 +43,7 @@ interface DeployState {
 
   setDeployment: (projectId: string, deployment: Deployment) => void;
   updateStatus: (projectId: string, status: DeploymentStatus, error?: string) => void;
+  bumpRevision: (projectId: string) => void;
   removeDeployment: (projectId: string) => void;
   getDeployment: (projectId: string) => Deployment | undefined;
   reset: () => void;
@@ -60,6 +75,17 @@ export const useDeployStore = create<DeployState>((set, get) => ({
           status,
           errorMessage: error || null,
         });
+      }
+      return { deployments: next };
+    });
+  },
+
+  bumpRevision: (projectId) => {
+    set((state) => {
+      const next = new Map(state.deployments);
+      const existing = next.get(projectId);
+      if (existing) {
+        next.set(projectId, { ...existing, deployRevision: (existing.deployRevision || 0) + 1 });
       }
       return { deployments: next };
     });
