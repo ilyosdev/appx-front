@@ -6,6 +6,8 @@ export interface AiModel {
   provider: string;
   openrouterId: string | null;
   isFree: boolean;
+  creditCost?: number;
+  description?: string;
 }
 
 // User-facing: fetch available models

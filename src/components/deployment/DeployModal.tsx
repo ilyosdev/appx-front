@@ -15,7 +15,7 @@ export function DeployModal({
   onClose,
   projectId,
   projectName,
-  publishedUrl,
+  publishedUrl: _publishedUrl,
   onDeploymentComplete,
 }: DeployModalProps) {
   return (
@@ -23,7 +23,6 @@ export function DeployModal({
       <DeploymentPanel
         projectId={projectId}
         projectName={projectName}
-        initialUrl={publishedUrl}
         variant="inline"
         onDeploymentComplete={(url) => {
           onDeploymentComplete?.(url);

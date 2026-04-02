@@ -43,6 +43,7 @@ export function useDeployment(projectId: string | undefined): UseDeploymentRetur
             desiredInstances: data.desiredInstances,
             actualInstances: data.actualInstances,
             scaleMode: data.scaleMode,
+            alwaysOn: data.alwaysOn,
           });
         }
       })
@@ -97,6 +98,7 @@ export function useDeployment(projectId: string | undefined): UseDeploymentRetur
           projectId,
           appName: existing?.appName || '',
           webUrl: data.webUrl,
+          expoUrl: existing?.expoUrl ?? null,
           status: data.status,
         });
       } else {

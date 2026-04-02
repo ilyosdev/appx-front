@@ -358,7 +358,6 @@ function deduplicateNamedImports(code: string): string {
       const hasDefault = /import\s+(\w+)\s*,\s*\{/.test(fullMatch);
       if (hasDefault) {
         // Keep just the default: import X, { ... } → import X
-        const defaultName = fullMatch.match(/import\s+(\w+)\s*,/)![1];
         replacements.push({
           original: fullMatch,
           replacement: fullMatch.replace(/\s*,\s*\{[^}]*\}/, ""),
@@ -498,7 +497,7 @@ function stripFunctionParamTypes(line: string): string {
 /**
  * Strips TypeScript-only syntax from AI-generated code so Babel can parse it.
  */
-function stripTypeScriptSyntax(code: string): string {
+export function stripTypeScriptSyntax(code: string): string {
   // --- Balanced bracket helpers ---
 
   // Find matching '>' for a '<' at openIdx, respecting nesting. Returns -1 if unbalanced.

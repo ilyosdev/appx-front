@@ -55,13 +55,15 @@ import { PhonePreviewPanel } from "@/components/canvas/PhonePreviewPanel";
 // ExportModal — coming soon
 import { ProjectSettingsModal } from "@/components/canvas/ProjectSettingsModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { WebPreview } from "@/components/preview/WebPreview";
 import { PreviewConsole } from "@/components/preview/PreviewConsole";
 import { DeviceTestingSidebar } from "@/components/canvas/DeviceTestingSidebar";
 import { PlanApprovalModal } from "@/components/canvas/PlanApprovalModal";
 import { VersionHistoryModal } from "@/components/canvas/VersionHistoryModal";
+import { VersionHistory } from "@/components/canvas/VersionHistory";
 // TestPanel — replaced by inline deployment in CanvasHeader
 import { DesignSystemPanel } from "@/components/canvas/DesignSystemPanel";
+import { ScreenListPanel } from "@/components/canvas/ScreenListPanel";
+import { FileTree } from "@/components/canvas/FileTree";
 
 const MonacoEditor = lazy(() => import("@monaco-editor/react").then(m => ({ default: m.default })));
 
@@ -350,6 +352,7 @@ export default function ProjectPage() {
   const [savingFile, setSavingFile] = useState<string | null>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mobileTab, setMobileTab] = useState<'chat' | 'preview' | 'test'>('chat');
+  const [codeTreeTab, setCodeTreeTab] = useState<'screens' | 'files'>('files');
   // Deployment — live preview via Railover container
   const { deployment, provision, wake } = useDeployment(projectId);
   const deploymentWebUrl = useMemo(() => deployment?.webUrl || null, [deployment?.webUrl]);
@@ -358,6 +361,7 @@ export default function ProjectPage() {
   const [variationParentId, setVariationParentId] = useState<string | undefined>();
   const [_isGeneratingVariation, setIsGeneratingVariation] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [showProjectHistory, setShowProjectHistory] = useState(false);
   const [designSystemOpen, setDesignSystemOpen] = useState(false);
   const chatResize = useResizablePanel({ defaultWidth: 380, minWidth: 280, maxWidth: 550, storageKey: 'appx-chat-width' });
   const chatWidth = chatResize.width;
@@ -625,6 +629,29 @@ export default function ProjectPage() {
     return map;
   }, [projectFiles]);
 
+  // Build file-type map keyed by lowercase screen name for ScreenListPanel badges
+  const fileTypeMap = useMemo(() => {
+    if (!projectFiles?.length) return undefined;
+    const map: Record<string, { fileType?: string; filePath?: string }> = {};
+    for (const f of projectFiles) {
+      if (f.screenName) {
+        map[f.screenName.toLowerCase()] = {
+          fileType: f.isScreen ? 'screen' : (f.contentType || undefined),
+          filePath: f.path,
+        };
+      } else if (f.isScreen) {
+        // Derive name from path: app/(tabs)/profile.tsx => "profile"
+        const name = (f.path.split('/').pop() || '').replace(/\.tsx?$/, '');
+        if (name && name !== '_layout' && name !== 'index') {
+          map[name.toLowerCase()] = { fileType: 'screen', filePath: f.path };
+        } else if (name === 'index') {
+          map['home'] = { fileType: 'screen', filePath: f.path };
+        }
+      }
+    }
+    return Object.keys(map).length > 0 ? map : undefined;
+  }, [projectFiles]);
+
   // ---------- Editable code tab ----------
   const { saveFile } = useProjectFiles(projectId);
   const user = useAuthStore((s) => s.user);
@@ -672,8 +699,8 @@ export default function ProjectPage() {
     });
   }, [selectedFile, selectedFileId, canEditCode, dirtyFiles, saveFile]);
 
-  // Derive tab screens from project files when app/(tabs)/*.tsx files exist
-  const _tabScreensFromFiles = useMemo(() => {
+  // Derive tab screens from project files when app/(tabs)/*.tsx files exist (reserved for upcoming feature)
+  void useMemo(() => {
     if (!filesMap) return undefined;
     let tabEntries = Object.entries(filesMap)
       .filter(([path]) => /^app\/\(tabs\)\/[^/]+\.tsx?$/.test(path))
@@ -854,6 +881,17 @@ export default function ProjectPage() {
         refetch();
         queryClient.invalidateQueries({ queryKey: ['project', projectId] });
         queryClient.invalidateQueries({ queryKey: ['project-files', projectId] });
+
+        // Sync file metadata to DB so project_files_v2 reflects newly generated files
+        if (projectId) {
+          api.post(`/projects/${projectId}/files/sync`).then(() => {
+            console.log('[ProjectPage] File metadata synced after generation');
+            // Re-invalidate project-files to pick up the synced data
+            queryClient.invalidateQueries({ queryKey: ['project-files', projectId] });
+          }).catch((err) => {
+            console.warn('[ProjectPage] File sync failed (non-critical):', err?.message || err);
+          });
+        }
       }, 1000);
 
     }
@@ -959,7 +997,6 @@ export default function ProjectPage() {
 
     const isNewProjectFromWizard = locationState?.isNewProject === true;
     const initialGenerationDone = project?.initialGenerationCompleted === true;
-    const _projectHasNoScreens = !project?.screens || project.screens.length === 0;
 
     // Only auto-generate from explicitly approved design system or wizard locationState.
     // NEVER auto-generate from project.designSystem — user must approve via PlanApprovalModal first.
@@ -1292,6 +1329,24 @@ export default function ProjectPage() {
 
   const handleViewScreen = useCallback((screenId: string) => setSelectedIds([screenId]), []);
 
+  // Select screen in code tab — also find its corresponding file
+  const handleCodeScreenSelect = useCallback((screenId: string) => {
+    setSelectedIds([screenId]);
+    const screen = screens.find(s => s.id === screenId);
+    if (screen && projectFiles?.length) {
+      // Try to find the matching file by screen name -> file path
+      const screenSlug = slugify(screen.name);
+      const matchingFile = projectFiles.find((f: { path: string; isScreen?: boolean; screenName?: string | null }) =>
+        f.isScreen && f.screenName?.toLowerCase() === screen.name.toLowerCase()
+      ) || projectFiles.find((f: { path: string }) =>
+        f.path.toLowerCase().includes(screenSlug) && f.path.endsWith('.tsx')
+      );
+      if (matchingFile) {
+        setSelectedFile(matchingFile.path);
+      }
+    }
+  }, [screens, projectFiles]);
+
   const handleGenerateRecommended = useCallback(
     async (screenIds: string[]) => {
       if (!project?.id) return;
@@ -1415,6 +1470,7 @@ export default function ProjectPage() {
         }}
         centerTab={centerTab}
         onCenterTabChange={setCenterTab}
+        onHistory={() => setShowProjectHistory(prev => !prev)}
       />
 
       {(initialGenerationWaitingForSocket || initialGenerationError) && (
@@ -1590,6 +1646,7 @@ export default function ProjectPage() {
                 enabledFeatures={project?.enabledFeatures || []}
                 onFeaturesChange={handleFeaturesChange}
                 referenceImageUrl={project?.referenceImageUrl}
+                projectFiles={projectFiles}
               />
             )}
           </div>
@@ -1673,20 +1730,59 @@ export default function ProjectPage() {
               </div>
               {/* Middle: file tree + editor + optional preview */}
               <div className="flex-1 flex overflow-hidden">
-                {/* File tree sidebar */}
-                <div className="w-56 flex-shrink-0 border-r border-surface-800/50 bg-surface-950 overflow-y-auto">
-                  <div className="px-3 py-2">
-                    <h3 className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider mb-2">Files</h3>
+                {/* File tree / Screen list sidebar */}
+                <div className="w-56 flex-shrink-0 border-r border-surface-800/50 bg-surface-950 flex flex-col overflow-hidden">
+                  {/* Screens | Files tab switcher */}
+                  <div className="flex border-b border-surface-800/50">
+                    <button
+                      onClick={() => setCodeTreeTab('screens')}
+                      className={cn(
+                        "flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-[11px] font-medium transition-colors",
+                        codeTreeTab === 'screens'
+                          ? "text-white border-b-2 border-primary-400 bg-surface-900/50"
+                          : "text-surface-500 hover:text-surface-300 hover:bg-surface-800/30",
+                      )}
+                    >
+                      <Smartphone className="w-3 h-3" />
+                      Screens
+                    </button>
+                    <button
+                      onClick={() => setCodeTreeTab('files')}
+                      className={cn(
+                        "flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-[11px] font-medium transition-colors",
+                        codeTreeTab === 'files'
+                          ? "text-white border-b-2 border-primary-400 bg-surface-900/50"
+                          : "text-surface-500 hover:text-surface-300 hover:bg-surface-800/30",
+                      )}
+                    >
+                      <FolderTree className="w-3 h-3" />
+                      Files
+                    </button>
                   </div>
-                  {(!projectFiles || projectFiles.length === 0) ? (
-                    <p className="text-xs text-surface-600 px-3">No files yet</p>
-                  ) : (
-                    <FileTreeView
-                      files={projectFiles as Array<{ path: string; content: string }>}
-                      selectedFile={selectedFile}
-                      onSelectFile={setSelectedFile}
-                    />
-                  )}
+
+                  {/* Tab content */}
+                  <div className="flex-1 overflow-y-auto">
+                    {codeTreeTab === 'screens' ? (
+                      <ScreenListPanel
+                        screens={screens}
+                        selectedId={selectedIds[0] ?? null}
+                        onSelectScreen={handleCodeScreenSelect}
+                        onAddScreen={() => {
+                          // Switch to chat to add a new screen
+                          setCenterTab('preview');
+                        }}
+                        fileTypeMap={fileTypeMap}
+                      />
+                    ) : (!projectFiles || projectFiles.length === 0) ? (
+                      <p className="text-xs text-surface-600 px-3 py-3">No files yet</p>
+                    ) : (
+                      <FileTree
+                        files={projectFiles.map((f: { path: string }) => ({ path: f.path }))}
+                        selectedFile={selectedFile ?? undefined}
+                        onSelectFile={setSelectedFile}
+                      />
+                    )}
+                  </div>
                 </div>
                 {/* Editor */}
                 <div className="flex-1 overflow-hidden">
@@ -1807,7 +1903,13 @@ export default function ProjectPage() {
                 if (deployment) {
                   useDeployStore.getState().setDeployment(projectId!, { ...deployment, alwaysOn: enabled });
                 }
-              } catch { /* settings modal handles toast */ }
+              } catch (err: any) {
+                // Revert toggle on failure
+                if (deployment) {
+                  useDeployStore.getState().setDeployment(projectId!, { ...deployment, alwaysOn: !enabled });
+                }
+                console.error('Always-on toggle failed:', err?.response?.data?.message || err.message);
+              }
             }}
             isPaidPlan={userPlan === 'pro' || userPlan === 'business'}
             onOpenSettings={() => setShowSettings(true)}
@@ -2000,6 +2102,7 @@ export default function ProjectPage() {
                     isActionLogActive={isActionLogActive}
                     enabledFeatures={project?.enabledFeatures || []}
                     onFeaturesChange={handleFeaturesChange}
+                    projectFiles={projectFiles}
                   />
                 )}
               </div>
@@ -2102,6 +2205,28 @@ export default function ProjectPage() {
         )}
       </AnimatePresence>
 
+      {/* Project-level version history slide-out panel */}
+      <AnimatePresence>
+        {showProjectHistory && projectId && (
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className="fixed top-12 right-0 bottom-0 w-80 z-40 bg-surface-900 border-l border-surface-700/50 shadow-2xl shadow-black/40"
+          >
+            <VersionHistory projectId={projectId} className="h-full" />
+            <button
+              onClick={() => setShowProjectHistory(false)}
+              className="absolute top-3 right-3 p-1 rounded-md text-surface-400 hover:text-white hover:bg-surface-800 transition-colors"
+              title="Close"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {projectId && (
         <ProjectSettingsModal
           isOpen={showSettings}
@@ -2180,7 +2305,7 @@ export default function ProjectPage() {
 }
 
 /** Rork-style file tree with folder grouping */
-function FileTreeView({
+export function FileTreeView({
   files,
   selectedFile,
   onSelectFile,

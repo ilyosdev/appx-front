@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Bot, User, Sparkles, Eye, Check, Loader2, AlertCircle, AlertTriangle, RotateCcw, Pencil, FileText, Pencil as PencilIcon, Play, X as XIcon, ListChecks } from "lucide-react";
+import { Bot, User, Sparkles, Eye, Check, Loader2, AlertCircle, AlertTriangle, RotateCcw, Pencil, FileText, Pencil as PencilIcon, Play, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { rewriteStorageUrl } from "@/lib/api";
 import type { LocalMessage, RecommendationItem, ScreenData } from "@/types/canvas";
@@ -506,7 +506,7 @@ export function ChatMessageBubble({
               defaultExpanded
             />
           )}
-          {!isUser && !message.isStreaming && message.metadata?.actionLogs && (
+          {!isUser && !message.isStreaming && !!message.metadata?.actionLogs && (
             <ActionLogSection
               actionLogs={message.metadata.actionLogs as import("@/types/canvas").ActionLogEvent[]}
             />

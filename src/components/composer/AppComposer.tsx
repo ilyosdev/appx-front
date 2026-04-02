@@ -7,7 +7,6 @@ import {
   AlertCircle,
   Loader2,
   X,
-  CheckCircle,
   ArrowUp,
   Wand2,
   Copy,

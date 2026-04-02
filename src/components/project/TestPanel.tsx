@@ -12,7 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useDeployment } from "@/hooks/useDeployment";
-import { cn } from "@/lib/utils";
+// cn import removed - not currently used
 
 interface TestPanelProps {
   projectId: string;

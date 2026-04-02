@@ -15,13 +15,13 @@ import {
   Paperclip,
   ListChecks,
   Sparkles,
-  Puzzle,
   Smartphone,
   ChevronDown,
   ArrowDown,
   Dumbbell,
   ChefHat,
   Users,
+  FileCode,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -227,6 +227,8 @@ export interface ChatSidebarProps {
   emitEditUndo?: (screenId: string, versionId: string) => void;
   /** Callback when an edit is undone via socket */
   onEditUndone?: (callback: (data: { screenId: string; versionId: string; screen: any }) => void) => void;
+  /** Project files for file-targeting in chat (from /projects/:id/files) */
+  projectFiles?: Array<{ path: string; id: string; isScreen?: boolean; screenName?: string | null }>;
 }
 
 export function ChatSidebar({
@@ -274,6 +276,7 @@ export function ChatSidebar({
   referenceImageUrl,
   emitEditUndo,
   onEditUndone,
+  projectFiles,
 }: ChatSidebarProps) {
   const {
     messages: localMessages,
@@ -310,7 +313,11 @@ export function ChatSidebar({
   // Screen selector: which screen the user wants to target for edits
   // Default to undefined (general mode) — user explicitly picks a screen when they want to edit
   const [chatScreenId, setChatScreenId] = useState<string | undefined>(undefined);
+  // File selector: target a specific file path for edits (alternative to screen selection)
+  const [chatFilePath, setChatFilePath] = useState<string | undefined>(undefined);
   const [screenDropdownOpen, setScreenDropdownOpen] = useState(false);
+  // Which tab is active in the dropdown: 'screens' or 'files'
+  const [selectorTab, setSelectorTab] = useState<'screens' | 'files'>('screens');
   const screenDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close screen dropdown on outside click
@@ -325,6 +332,8 @@ export function ChatSidebar({
   }, []);
 
   const selectedScreen = screens?.find((s) => s.id === chatScreenId);
+  // Derive display filename from chatFilePath
+  const selectedFileName = chatFilePath ? chatFilePath.split('/').pop() || chatFilePath : undefined;
 
   const [pendingImages, setPendingImages] = useState<Array<{
     id: string;
@@ -515,7 +524,7 @@ export function ChatSidebar({
   const assistantMessageIdRef = useRef<string | null>(null);
   const addedSkeletonNameRef = useRef<string | null>(null);
   const actionLogsRef = useRef<ActionLogEvent[]>([]);
-  actionLogsRef.current = actionLogs;
+  actionLogsRef.current = actionLogs ?? [];
   const effectiveScreenIdRef = useRef<string | undefined>(undefined);
   const chatTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -996,7 +1005,7 @@ export function ChatSidebar({
               (msg.id === assistantMessageId || (dbMessageId && msg.id === dbMessageId))
                 ? {
                     ...msg,
-                    id: dbMessageId || assistantMessageId,
+                    id: dbMessageId || assistantMessageId || msg.id,
                     content: contentText,
                     isStreaming: false,
                     metadata: {
@@ -1561,8 +1570,30 @@ export function ChatSidebar({
     }
     setPendingImages([]);
 
-    sendMessage(message, undefined, chatScreenId, imageUrls.length > 0 ? imageUrls : undefined);
-  }, [input, sendMessage, pendingImages, chatScreenId]);
+    // If a file is targeted (not a screen), resolve screen ID from file if possible,
+    // and prepend file context to the message so the AI pipeline targets that file.
+    let effectiveMessage = message;
+    let effectiveOverrideScreenId = chatScreenId;
+
+    if (chatFilePath && !chatScreenId) {
+      // Try to find a screen that corresponds to this file path
+      const matchingFile = projectFiles?.find(f => f.path === chatFilePath);
+      if (matchingFile?.isScreen) {
+        // Find the screen by name to get its ID
+        const matchedScreen = screens?.find(s =>
+          s.name === matchingFile.screenName ||
+          matchingFile.path.toLowerCase().includes(s.name.toLowerCase().replace(/\s+/g, '-'))
+        );
+        if (matchedScreen) {
+          effectiveOverrideScreenId = matchedScreen.id;
+        }
+      }
+      // Prepend file path context so the AI targets that specific file
+      effectiveMessage = `[File: ${chatFilePath}]\n${message}`;
+    }
+
+    sendMessage(effectiveMessage, undefined, effectiveOverrideScreenId, imageUrls.length > 0 ? imageUrls : undefined);
+  }, [input, sendMessage, pendingImages, chatScreenId, chatFilePath, projectFiles, screens]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -2124,9 +2155,11 @@ export function ChatSidebar({
                         ? `Describe changes to this ${selectedElement.elementType}...`
                         : selectedScreen
                           ? `Describe changes to "${selectedScreen.name}"...`
-                          : screenName
-                            ? `Edit "${screenName}" or create new screen...`
-                            : "Describe the mobile app you want to build..."
+                          : chatFilePath
+                            ? `Describe changes to ${selectedFileName}...`
+                            : screenName
+                              ? `Edit "${screenName}" or create new screen...`
+                              : "Describe the mobile app you want to build..."
                 }
                 disabled={isStreaming}
                 rows={2}
@@ -2151,9 +2184,10 @@ export function ChatSidebar({
                   <Paperclip className="w-3.5 h-3.5" />
                 </button>
 
-                {/* Compact screen selector */}
-                {screens && screens.length > 0 && (
+                {/* Compact screen/file selector */}
+                {((screens && screens.length > 0) || (projectFiles && projectFiles.length > 0)) && (
                   <div ref={screenDropdownRef} className="relative">
+                    {/* Active selection pill */}
                     {chatScreenId && selectedScreen ? (
                       <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary-500/10 border border-primary-500/25">
                         <Smartphone className="w-3 h-3 text-primary-400 flex-shrink-0" />
@@ -2168,35 +2202,121 @@ export function ChatSidebar({
                           <X className="w-2.5 h-2.5" />
                         </button>
                       </div>
+                    ) : chatFilePath && selectedFileName ? (
+                      <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25">
+                        <FileCode className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                        <span className="text-[11px] text-emerald-300 font-medium truncate max-w-[80px] font-mono">
+                          {selectedFileName}
+                        </span>
+                        <button
+                          onClick={() => setChatFilePath(undefined)}
+                          className="p-0.5 rounded text-surface-400 hover:text-white transition-colors flex-shrink-0"
+                          title="Clear file selection"
+                        >
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      </div>
                     ) : (
                       <button
                         onClick={() => setScreenDropdownOpen(!screenDropdownOpen)}
                         className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-surface-400 hover:text-surface-300 hover:bg-surface-700/50 transition-colors"
                       >
                         <Smartphone className="w-3 h-3 flex-shrink-0" />
-                        <span>Screen</span>
+                        <span>Target</span>
                         <ChevronDown className={cn("w-2.5 h-2.5 transition-transform", screenDropdownOpen && "rotate-180")} />
                       </button>
                     )}
 
+                    {/* Dropdown with Screens / Files tabs */}
                     {screenDropdownOpen && (
-                      <div className="absolute bottom-full left-0 mb-1 w-48 max-h-48 overflow-y-auto bg-surface-900 border border-surface-700 rounded-lg shadow-xl z-50 py-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-surface-700">
-                        {screens.map((s) => (
+                      <div className="absolute bottom-full left-0 mb-1 w-56 max-h-64 bg-surface-900 border border-surface-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                        {/* Tab bar */}
+                        <div className="flex border-b border-surface-700">
                           <button
-                            key={s.id}
-                            onClick={() => {
-                              setChatScreenId(s.id);
-                              setScreenDropdownOpen(false);
-                            }}
-                            className="w-full text-left px-3 py-2 hover:bg-surface-800 transition-colors"
+                            onClick={() => setSelectorTab('screens')}
+                            className={cn(
+                              "flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-[11px] font-medium transition-colors",
+                              selectorTab === 'screens'
+                                ? "text-white border-b border-primary-400 bg-surface-800/50"
+                                : "text-surface-500 hover:text-surface-300"
+                            )}
                           >
-                            <div className="flex items-center gap-2">
-                              <Smartphone className="w-3.5 h-3.5 text-surface-400 flex-shrink-0" />
-                              <span className="text-sm font-medium text-white truncate">{s.name}</span>
-                              <span className="ml-auto text-[10px] text-surface-500 flex-shrink-0">{s.type}</span>
-                            </div>
+                            <Smartphone className="w-3 h-3" />
+                            Screens
                           </button>
-                        ))}
+                          <button
+                            onClick={() => setSelectorTab('files')}
+                            className={cn(
+                              "flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-[11px] font-medium transition-colors",
+                              selectorTab === 'files'
+                                ? "text-white border-b border-emerald-400 bg-surface-800/50"
+                                : "text-surface-500 hover:text-surface-300"
+                            )}
+                          >
+                            <FileCode className="w-3 h-3" />
+                            Files
+                          </button>
+                        </div>
+
+                        {/* Tab content */}
+                        <div className="max-h-48 overflow-y-auto py-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-surface-700">
+                          {selectorTab === 'screens' ? (
+                            screens && screens.length > 0 ? (
+                              screens.map((s) => (
+                                <button
+                                  key={s.id}
+                                  onClick={() => {
+                                    setChatScreenId(s.id);
+                                    setChatFilePath(undefined);
+                                    setScreenDropdownOpen(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-surface-800 transition-colors"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Smartphone className="w-3.5 h-3.5 text-surface-400 flex-shrink-0" />
+                                    <span className="text-sm font-medium text-white truncate">{s.name}</span>
+                                    <span className="ml-auto text-[10px] text-surface-500 flex-shrink-0">{s.type}</span>
+                                  </div>
+                                </button>
+                              ))
+                            ) : (
+                              <p className="px-3 py-2 text-xs text-surface-500">No screens yet</p>
+                            )
+                          ) : (
+                            projectFiles && projectFiles.length > 0 ? (
+                              projectFiles
+                                .filter(f => !f.path.endsWith('/'))
+                                .map((f) => (
+                                  <button
+                                    key={f.id}
+                                    onClick={() => {
+                                      setChatFilePath(f.path);
+                                      setChatScreenId(undefined);
+                                      setScreenDropdownOpen(false);
+                                    }}
+                                    className="w-full text-left px-3 py-1.5 hover:bg-surface-800 transition-colors"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <FileCode className="w-3.5 h-3.5 text-surface-400 flex-shrink-0" />
+                                      <div className="min-w-0 flex-1">
+                                        <span className="text-xs font-medium text-white truncate block font-mono">
+                                          {f.path.split('/').pop()}
+                                        </span>
+                                        <span className="text-[10px] text-surface-500 truncate block font-mono">
+                                          {f.path.split('/').slice(0, -1).join('/')}
+                                        </span>
+                                      </div>
+                                      {f.isScreen && (
+                                        <span className="text-[9px] text-primary-400 bg-primary-500/10 px-1 py-0.5 rounded flex-shrink-0">screen</span>
+                                      )}
+                                    </div>
+                                  </button>
+                                ))
+                            ) : (
+                              <p className="px-3 py-2 text-xs text-surface-500">No files yet</p>
+                            )
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

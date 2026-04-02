@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Smartphone, RefreshCw, Loader2, AlertCircle, Rocket, ArrowUpRight, Settings, Power, CheckCircle2, Moon, Zap } from 'lucide-react';
+import { Smartphone, RefreshCw, Loader2, AlertCircle, Rocket, ArrowUpRight, Settings, CheckCircle2, Moon, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DeploymentStatus } from '@/stores/deployStore';
 
@@ -39,8 +39,8 @@ export function DeviceTestingSidebar({
   isPaidPlan,
   onOpenSettings,
   onScale,
-  desiredInstances,
-  actualInstances,
+  desiredInstances: _desiredInstances,
+  actualInstances: _actualInstances,
 }: DeviceTestingSidebarProps) {
   const isTransient =
     status === 'provisioning' || status === 'warm' || status === 'deploying';
@@ -308,7 +308,7 @@ function LimitReachedState({
 
 function RunningState({
   projectId,
-  expoUrl,
+  expoUrl: _expoUrl,
   connectedDevice,
   alwaysOn,
   onToggleAlwaysOn,

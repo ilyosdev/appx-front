@@ -15,7 +15,7 @@ export function ContainerLogsPanel({ projectId }: ContainerLogsPanelProps) {
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval>>();
+  const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   const fetchLogs = useCallback(async () => {
     setIsLoading(true);

@@ -66,7 +66,7 @@ export function ContainerResourcesPanel({ projectId, isOpen }: ContainerResource
   const [metrics, setMetrics] = useState<ContainerMetrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval>>();
+  const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   const fetchMetrics = useCallback(async () => {
     try {

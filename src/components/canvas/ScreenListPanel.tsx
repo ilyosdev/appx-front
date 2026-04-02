@@ -43,18 +43,46 @@ function getScreenIcon(name: string) {
   return Monitor;
 }
 
+/** Map from screen name (or screen ID) to file metadata from project_files_v2 */
+interface FileTypeInfo {
+  /** e.g. 'screen', 'component', 'util', 'config' */
+  fileType?: string;
+  /** e.g. 'app/(tabs)/index.tsx' */
+  filePath?: string;
+}
+
 interface ScreenListPanelProps {
   screens: ScreenData[];
   selectedId: string | null;
   onSelectScreen: (id: string) => void;
   onAddScreen: () => void;
+  /** Optional file-type metadata keyed by screen name (lowercase) */
+  fileTypeMap?: Record<string, FileTypeInfo>;
 }
+
+/** Short labels for known screen types */
+const screenTypeBadges: Record<string, { label: string; color: string }> = {
+  tab: { label: 'Tab', color: 'text-blue-400 bg-blue-500/10' },
+  modal: { label: 'Modal', color: 'text-purple-400 bg-purple-500/10' },
+  stack: { label: 'Stack', color: 'text-cyan-400 bg-cyan-500/10' },
+  drawer: { label: 'Drawer', color: 'text-amber-400 bg-amber-500/10' },
+};
+
+/** Short labels for file types from project_files_v2 */
+const fileTypeBadges: Record<string, { label: string; color: string }> = {
+  screen: { label: 'Screen', color: 'text-primary-400 bg-primary-500/10' },
+  component: { label: 'Component', color: 'text-emerald-400 bg-emerald-500/10' },
+  util: { label: 'Util', color: 'text-orange-400 bg-orange-500/10' },
+  config: { label: 'Config', color: 'text-surface-400 bg-surface-500/10' },
+  layout: { label: 'Layout', color: 'text-indigo-400 bg-indigo-500/10' },
+};
 
 export function ScreenListPanel({
   screens,
   selectedId,
   onSelectScreen,
   onAddScreen,
+  fileTypeMap,
 }: ScreenListPanelProps) {
   const handleClick = useCallback(
     (id: string) => {
@@ -104,9 +132,38 @@ export function ScreenListPanel({
                 <Icon className="w-3.5 h-3.5" />
               </div>
 
-              <span className="flex-1 text-sm font-medium truncate">
-                {screen.name}
-              </span>
+              <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                <span className="text-sm font-medium truncate">
+                  {screen.name}
+                </span>
+
+                {/* Screen type badge (Tab, Modal, etc.) */}
+                {screen.type && screenTypeBadges[screen.type.toLowerCase()] && (
+                  <span className={cn(
+                    "flex-shrink-0 text-[9px] font-medium px-1.5 py-0 rounded",
+                    screenTypeBadges[screen.type.toLowerCase()].color,
+                  )}>
+                    {screenTypeBadges[screen.type.toLowerCase()].label}
+                  </span>
+                )}
+
+                {/* File type badge from project_files_v2 */}
+                {(() => {
+                  const ftInfo = fileTypeMap?.[screen.name.toLowerCase()];
+                  const ftBadge = ftInfo?.fileType ? fileTypeBadges[ftInfo.fileType.toLowerCase()] : undefined;
+                  if (!ftBadge) return null;
+                  // Don't show "Screen" badge if already showing a screen-type badge
+                  if (ftInfo?.fileType?.toLowerCase() === 'screen' && screen.type && screenTypeBadges[screen.type.toLowerCase()]) return null;
+                  return (
+                    <span className={cn(
+                      "flex-shrink-0 text-[9px] font-medium px-1.5 py-0 rounded",
+                      ftBadge.color,
+                    )}>
+                      {ftBadge.label}
+                    </span>
+                  );
+                })()}
+              </div>
 
               {/* Status indicator */}
               <div className="flex-shrink-0">

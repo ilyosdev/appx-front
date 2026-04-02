@@ -42,7 +42,7 @@ function Reveal({ children, className, id, delay = 0 }: { children: React.ReactN
 
 
 // ─── NAV ───────────────────────────────────────────────
-function Nav({ ctaPath, isAuthenticated }: { ctaPath: string; isAuthenticated: boolean }) {
+function Nav({ ctaPath: _ctaPath, isAuthenticated }: { ctaPath: string; isAuthenticated: boolean }) {
   const { t } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -286,7 +286,6 @@ export default function Landing() {
           className="w-full h-full"
           colors={["#000000", "#0a0a0a", "#1a1a1a", "#2a2a2a"]}
           speed={0.8}
-          backgroundColor="#000000"
         />
         <div className="absolute inset-0 bg-black/40" />
       </div>

@@ -113,16 +113,16 @@ export function PhonePreviewPanel({
             <IconBtn icon={Minimize2} onClick={() => setFullscreen(false)} title="Phone frame" />
           </div>
         </div>
-        <iframe key={`fs-${stableUrl}-${refreshKey}`} src={stableUrl!} className="flex-1 border-0 bg-white" title="Preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" />
+        <iframe key={`fs-${stableUrl}-${refreshKey}`} src={stableUrl!} className="flex-1 border-0 bg-black" title="Preview" />
       </div>
     );
   }
 
   // Screen content — deployment URL iframe takes priority over loading state
   const content = stableUrl && isRNProject ? (
-    <iframe key={`d-${stableUrl}-${refreshKey}`} src={stableUrl} className="w-full h-full border-0 bg-white" title="Preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" />
+    <iframe key={`d-${stableUrl}-${refreshKey}`} src={stableUrl} className="w-full h-full border-0 bg-black" title="Preview" />
   ) : !screen && stableUrl ? (
-    <iframe key={`d2-${stableUrl}-${refreshKey}`} src={stableUrl} className="w-full h-full border-0 bg-white" title="Preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" />
+    <iframe key={`d2-${stableUrl}-${refreshKey}`} src={stableUrl} className="w-full h-full border-0 bg-black" title="Preview" />
   ) : !screen ? (
     <div className="w-full h-full flex items-center justify-center bg-surface-900">
       <Monitor className="w-10 h-10 opacity-50 text-surface-500" />
@@ -149,7 +149,7 @@ export function PhonePreviewPanel({
       )}
     </div>
   ) : isRNProject && stableUrl ? (
-    <iframe key={`d-${stableUrl}-${refreshKey}`} src={stableUrl} className="w-full h-full border-0 bg-white" title="Preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" />
+    <iframe key={`d-${stableUrl}-${refreshKey}`} src={stableUrl} className="w-full h-full border-0 bg-black" title="Preview" />
   ) : isRNProject ? (
     <div className="w-full h-full flex flex-col items-center justify-center bg-surface-900">
       <Loader2 className="w-6 h-6 text-primary-400 animate-spin mb-2" />

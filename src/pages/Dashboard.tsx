@@ -434,7 +434,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { user, initialize } = useAuthStore();
+  const { user: _user, initialize } = useAuthStore();
 
   // Initialize auth state on mount (restores user data on page refresh)
   useEffect(() => {

@@ -26,10 +26,10 @@ interface DeploymentPanelProps {
 export function DeploymentPanel({
   projectId,
   projectName,
-  onDeploymentComplete,
+  onDeploymentComplete: _onDeploymentComplete,
   variant = 'card',
 }: DeploymentPanelProps) {
-  const { deployment, status, isLoading, wake, destroy, provision } =
+  const { deployment, status, isLoading: _isLoading, wake, destroy, provision } =
     useDeployment(projectId);
   const [copied, setCopied] = useState(false);
 

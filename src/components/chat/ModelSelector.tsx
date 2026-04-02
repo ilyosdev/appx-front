@@ -10,7 +10,7 @@ const PROVIDER_ICONS: Record<string, React.ComponentType<{ className?: string }>
 };
 
 export function ModelSelector() {
-  const { availableModels, loading, hasFetched, fetchModels, setSelectedModel, getEffectiveModel } = useModelStore();
+  const { availableModels, loading, hasFetched: _hasFetched, fetchModels, setSelectedModel, getEffectiveModel } = useModelStore();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 

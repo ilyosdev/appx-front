@@ -89,7 +89,7 @@ export function DesignSystemPanel({
     try {
       const response = await designSystemApi.generateComponents(projectId);
       const newFiles: DesignSystemFile[] =
-        response.data?.data?.files || response.data?.files || [];
+        response.data?.data?.files || (response.data as any)?.files || [];
       onFilesUpdated(newFiles);
     } catch (err: any) {
       const msg =

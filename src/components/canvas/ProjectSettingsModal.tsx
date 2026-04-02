@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { projectsApi, type Project } from '@/lib/projects';
-import { Loader2, Check, X, Upload, Trash2, Wand2, Key, FileCode, Globe, Server, Copy, ExternalLink, RefreshCw, Shield, AlertTriangle, RotateCw, Terminal, Download, Zap, Moon, Gauge } from 'lucide-react';
+import { Loader2, Check, X, Upload, Trash2, Wand2, FileCode, Globe, Server, Copy, ExternalLink, RefreshCw, Shield, RotateCw, Terminal, Download, Zap, Moon, Gauge } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui';
 import { slugify } from '@/lib/slugify';
@@ -34,7 +34,7 @@ export function ProjectSettingsModal({
 }: ProjectSettingsModalProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { deployment, provision, wake, destroy, scale } = useDeployment(projectId);
+  const { deployment, provision, wake, destroy, scale: _scale } = useDeployment(projectId);
   const userPlan = useAuthStore((s) => s.user?.plan) ?? 'free';
   const isPaidPlan = userPlan === 'starter' || userPlan === 'pro' || userPlan === 'business';
 
@@ -77,7 +77,7 @@ export function ProjectSettingsModal({
   const [slugStatus, setSlugStatus] = useState<SlugStatus>('idle');
   const [isUploadingIcon, setIsUploadingIcon] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const slugCheckTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const slugCheckTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Reset form when modal opens or project changes
   useEffect(() => {
@@ -818,7 +818,7 @@ export function ProjectSettingsModal({
                     <div className="flex items-center gap-2 bg-surface-900 rounded-lg px-3 py-2">
                       <span className="text-xs text-surface-200 truncate flex-1 font-mono">{deployment.webUrl}</span>
                       <button
-                        onClick={() => { navigator.clipboard.writeText(deployment.webUrl!); toast({ title: 'URL copied!' }); }}
+                        onClick={() => { navigator.clipboard.writeText(deployment.webUrl!); toast({ title: 'URL copied!', variant: 'success' }); }}
                         className="text-surface-400 hover:text-white transition-colors flex-shrink-0"
                         title="Copy URL"
                       >
@@ -844,7 +844,7 @@ export function ProjectSettingsModal({
                     <div className="flex items-center gap-2 bg-surface-900 rounded-lg px-3 py-2">
                       <span className="text-xs text-surface-200 truncate flex-1 font-mono">{deployment.expoUrl}</span>
                       <button
-                        onClick={() => { navigator.clipboard.writeText(deployment.expoUrl!); toast({ title: 'URL copied!' }); }}
+                        onClick={() => { navigator.clipboard.writeText(deployment.expoUrl!); toast({ title: 'URL copied!', variant: 'success' }); }}
                         className="text-surface-400 hover:text-white transition-colors flex-shrink-0"
                       >
                         <Copy className="w-3.5 h-3.5" />
@@ -912,7 +912,7 @@ export function ProjectSettingsModal({
                               <div className="flex items-center gap-2 bg-surface-800 rounded px-2 py-1">
                                 <span className="text-[10px] text-surface-300 font-mono truncate">{customDomain} → myappx.live</span>
                                 <button
-                                  onClick={() => { navigator.clipboard.writeText(`${customDomain} CNAME myappx.live`); toast({ title: 'DNS record copied!' }); }}
+                                  onClick={() => { navigator.clipboard.writeText(`${customDomain} CNAME myappx.live`); toast({ title: 'DNS record copied!', variant: 'success' }); }}
                                   className="text-surface-500 hover:text-white transition-colors flex-shrink-0"
                                 >
                                   <Copy className="w-3 h-3" />
@@ -1021,7 +1021,7 @@ export function ProjectSettingsModal({
                       onClick={async () => {
                         if (window.confirm('Destroy this container? You can redeploy later.')) {
                           await destroy();
-                          toast({ title: 'Container destroyed' });
+                          toast({ title: 'Container destroyed', variant: 'success' });
                         }
                       }}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors"

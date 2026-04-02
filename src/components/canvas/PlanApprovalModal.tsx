@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { X, Plus, GripVertical, Trash2, Sparkles, Palette, Navigation, Check, Loader2, SendHorizontal, MessageCircle, ChevronDown, Globe, Tag, Smartphone, Layers } from 'lucide-react';
+import { X, Plus, GripVertical, Trash2, Sparkles, Palette, Navigation, Check, Loader2, SendHorizontal, MessageCircle, ChevronDown, Globe, Smartphone, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import type { DesignSystem, ScreenConfig, ColorPalette } from '@/lib/design-system';
@@ -31,7 +31,7 @@ const NAV_TYPE_LABELS: Record<string, string> = {
 const sectionAnimation = {
   initial: { opacity: 0, y: 12 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.35, ease: 'easeOut' },
+  transition: { duration: 0.35, ease: 'easeOut' as const },
 };
 
 function SectionSkeleton({ label }: { label: string }) {
@@ -536,7 +536,7 @@ export function PlanApprovalModal({
                     </div>
                     {apiIntegration.services?.length > 0 && (
                       <div className="flex items-center gap-1 flex-wrap">
-                        {apiIntegration.services.map(s => (
+                        {apiIntegration.services.map((s: string) => (
                           <span key={s} className="px-1.5 py-0.5 text-[10px] rounded bg-surface-800 border border-surface-700 text-surface-400">
                             {s}
                           </span>

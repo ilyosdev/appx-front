@@ -10,6 +10,7 @@ import {
   Trash2,
   Rocket,
   Check,
+  History,
 } from "lucide-react";
 import { useDeployment } from "@/hooks/useDeployment";
 import { cn } from "@/lib/utils";
@@ -72,6 +73,8 @@ interface CanvasHeaderProps {
   centerTab?: "preview" | "code";
   /** Callback to switch center panel tab */
   onCenterTabChange?: (tab: "preview" | "code") => void;
+  /** Callback to toggle project-level version history panel */
+  onHistory?: () => void;
 }
 
 export function CanvasHeader({
@@ -83,6 +86,7 @@ export function CanvasHeader({
   socketError,
   centerTab = "preview",
   onCenterTabChange,
+  onHistory,
 }: CanvasHeaderProps) {
   const navigate = useNavigate();
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
@@ -105,7 +109,7 @@ export function CanvasHeader({
 
   // Deployment status
   const {
-    deployment,
+    deployment: _deployment,
     status: deployStatus,
     provision,
   } = useDeployment(projectId);
@@ -116,17 +120,17 @@ export function CanvasHeader({
 
   // Collaboration
   const {
-    owner,
+    owner: _owner,
     collaborators,
     myAccessLevel,
     onlineUsers,
     showInviteModal,
-    openInviteModal,
+    openInviteModal: _openInviteModal,
     closeInviteModal,
     inviteCollaborator,
   } = useCollaboration(projectId);
 
-  const acceptedCollaborators = (collaborators || []).filter(
+  void (collaborators || []).filter(
     (c: { status: string }) => c.status === "accepted",
   );
 
@@ -238,6 +242,18 @@ export function CanvasHeader({
           <div className="hidden md:block">
             {projectId && <GitHubButton projectId={projectId} />}
           </div>
+
+          {/* History button — project-level version history */}
+          {onHistory && (
+            <button
+              onClick={onHistory}
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-surface-400 hover:text-surface-300 hover:bg-surface-800/50 transition-colors"
+              title="Version History"
+            >
+              <History className="w-3.5 h-3.5" />
+              <span>History</span>
+            </button>
+          )}
 
           {/* Publish button */}
           <button
