@@ -1,38 +1,27 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, useInView, useScroll, useTransform } from 'framer-motion';
+import { motion, useInView, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../stores/authStore';
 import { AppComposer } from '../components/composer/AppComposer';
-import { ArrowRight, Check, Menu, X, Github } from 'lucide-react';
+import { ArrowRight, Check, Menu, X, Github, Code2, Smartphone, Rocket, ChevronDown, MessageSquare, Upload, FileCode, Brain, Briefcase, Palette, Terminal, GraduationCap, Building2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from '../components/ui/LanguageSwitcher';
 import { cn } from '../lib/utils';
-import { MeshGradient } from '@paper-design/shaders-react';
 
 // ─── FONT ──────────────────────────────────────────────
-const FONT_LINK = 'https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap';
+const FONT_LINK = 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap';
 
-// ─── ANIMATION ─────────────────────────────────────────
-const reveal = {
-  hidden: { opacity: 0, y: 30 },
-  visible: (i: number = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.8, delay: i * 0.1, ease: [0.25, 0.46, 0.45, 0.94] },
-  }),
-};
-void reveal; // suppress unused warning
-
+// ─── REVEAL (scroll animation wrapper) ─────────────────
 function Reveal({ children, className, id, delay = 0 }: { children: React.ReactNode; className?: string; id?: string; delay?: number }) {
   const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true, margin: '-100px' });
+  const inView = useInView(ref, { once: true, margin: '-80px' });
   return (
     <motion.div
       ref={ref}
       id={id}
-      initial={{ opacity: 0, y: 40 }}
-      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
-      transition={{ duration: 0.9, delay, ease: [0.25, 0.46, 0.45, 0.94] }}
+      initial={{ opacity: 0, y: 32 }}
+      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 32 }}
+      transition={{ duration: 0.7, delay, ease: [0.25, 0.46, 0.45, 0.94] }}
       className={className}
     >
       {children}
@@ -40,9 +29,33 @@ function Reveal({ children, className, id, delay = 0 }: { children: React.ReactN
   );
 }
 
+// ─── SECTION LABEL ─────────────────────────────────────
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#3b82f6] mb-4">{children}</p>;
+}
+
+// ─── FOOTER COLUMN ─────────────────────────────────────
+function FooterCol({ title, items }: { title: string; items: { label: string; to?: string; href?: string }[] }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#999] mb-4">{title}</p>
+      <ul className="space-y-2.5">
+        {items.map((item) => (
+          <li key={item.label}>
+            {item.href ? (
+              <a href={item.href} className="text-sm text-[#555] hover:text-[#1a1615] transition-colors">{item.label}</a>
+            ) : (
+              <Link to={item.to!} className="text-sm text-[#555] hover:text-[#1a1615] transition-colors">{item.label}</Link>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 // ─── NAV ───────────────────────────────────────────────
-function Nav({ ctaPath: _ctaPath, isAuthenticated }: { ctaPath: string; isAuthenticated: boolean }) {
+function Nav({ ctaPath, isAuthenticated }: { ctaPath: string; isAuthenticated: boolean }) {
   const { t } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -53,83 +66,104 @@ function Nav({ ctaPath: _ctaPath, isAuthenticated }: { ctaPath: string; isAuthen
     return () => window.removeEventListener('scroll', fn);
   }, []);
 
+  const NAV_LINKS = [
+    { label: t('nav.features'), href: '#features' },
+    { label: t('nav.howItWorks'), href: '#how-it-works' },
+    { label: t('nav.pricing'), href: '#pricing' },
+    { label: t('nav.showcase'), href: '#showcase' },
+    { label: 'Docs', href: 'https://docs.appx.uz/intro', external: true },
+  ];
+
   return (
-    <nav className={cn(
-      'fixed top-0 inset-x-0 z-50 transition-all duration-500',
-      scrolled ? 'bg-black/80 backdrop-blur-2xl' : 'bg-transparent'
-    )}>
-      <div className="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl backdrop-blur-md bg-white/[0.06] border border-white/[0.1] flex items-center justify-center p-1.5">
-            <img src="/logo.png" alt="AppX" className="w-full h-full invert" />
+    <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full px-4">
+      <div
+        className={cn(
+          'max-w-[900px] w-full mx-auto px-6 h-14 flex items-center justify-between bg-white/80 backdrop-blur-xl rounded-full transition-shadow duration-300',
+          scrolled && 'shadow-[0_2px_20px_rgba(0,0,0,0.08)]'
+        )}
+      >
+        {/* Logo */}
+        <Link to="/" className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center p-1.5">
+            <img src="/logo.png" alt="AppX" className="w-full h-full" />
           </div>
-          <span className="font-sans font-semibold text-[15px] text-white tracking-tight">AppX</span>
+          <span className="font-semibold text-[15px] text-[#1a1615] tracking-tight">AppX</span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-8">
-          {[
-            { label: t('nav.features'), href: '#features' },
-            { label: t('nav.howItWorks'), href: '#how-it-works' },
-            { label: t('nav.pricing'), href: '#pricing' },
-            { label: 'Docs', href: 'https://docs.appx.uz/intro', target: '_blank' },
-          ].map((l) => (
-            <a key={l.href} href={l.href}
-              {...('target' in l ? { target: l.target, rel: 'noopener noreferrer' } : {})}
-              className="text-[13px] text-white/50 hover:text-white transition-colors duration-300">
+        {/* Center links */}
+        <div className="hidden md:flex items-center gap-6">
+          {NAV_LINKS.map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              {...(l.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+              className="text-sm text-[#555] hover:text-[#1a1615] transition-colors"
+            >
               {l.label}
             </a>
           ))}
         </div>
 
+        {/* Right side */}
         <div className="hidden md:flex items-center gap-3">
-          <LanguageSwitcher />
+          <LanguageSwitcher variant="light" />
           {isAuthenticated ? (
-            <Link to="/dashboard" className="text-[13px] font-medium text-white/70 hover:text-white transition-colors">
+            <Link to="/dashboard" className="text-sm font-medium text-[#555] hover:text-[#1a1615] transition-colors">
               {t('nav.dashboard')} →
             </Link>
           ) : (
             <>
-              <Link to="/login" className="text-[13px] text-white/50 hover:text-white transition-colors">
+              <Link to="/login" className="text-sm text-[#555] hover:text-[#1a1615] transition-colors">
                 {t('nav.signIn')}
               </Link>
-              <Link to="/register"
-                className="text-[13px] font-medium text-black bg-white hover:bg-white/90 rounded-full px-5 py-2 transition-all">
+              <Link
+                to={ctaPath}
+                className="bg-[#1a1615] text-white rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#2a2625] transition-colors"
+              >
                 {t('nav.startBuilding')}
               </Link>
             </>
           )}
         </div>
 
-        <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden p-2 text-white/50">
+        {/* Mobile hamburger */}
+        <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden p-2 text-[#555]">
           {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
       </div>
 
+      {/* Mobile panel */}
       {mobileOpen && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="md:hidden bg-black/90 backdrop-blur-2xl border-t border-white/[0.08] px-6 pb-6 pt-4"
+          className="md:hidden max-w-[900px] mx-auto mt-2 bg-white/95 backdrop-blur-xl border-t border-gray-100 rounded-2xl px-6 pb-6 pt-4 shadow-[0_2px_20px_rgba(0,0,0,0.08)]"
         >
-          {[
-            { label: t('nav.features'), href: '#features' },
-            { label: t('nav.howItWorks'), href: '#how-it-works' },
-            { label: t('nav.pricing'), href: '#pricing' },
-            { label: 'Docs', href: 'https://docs.appx.uz/intro', target: '_blank' },
-          ].map((l) => (
-            <a key={l.href} href={l.href}
-              {...('target' in l ? { target: l.target, rel: 'noopener noreferrer' } : {})}
+          {NAV_LINKS.map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              {...(l.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
               onClick={() => setMobileOpen(false)}
-              className="block text-sm text-white/50 hover:text-white py-2.5">{l.label}</a>
+              className="block text-sm text-[#555] hover:text-[#1a1615] py-2.5"
+            >
+              {l.label}
+            </a>
           ))}
-          <div className="border-t border-white/[0.08] pt-4 mt-3 space-y-3">
-            <LanguageSwitcher />
+          <div className="border-t border-gray-100 pt-4 mt-3 space-y-3">
+            <LanguageSwitcher variant="light" />
             {isAuthenticated ? (
-              <Link to="/dashboard" className="block text-sm font-medium text-black text-center bg-white rounded-full py-2.5">{t('nav.dashboard')}</Link>
+              <Link to="/dashboard" className="block text-sm font-semibold text-center bg-[#1a1615] text-white rounded-full py-2.5">
+                {t('nav.dashboard')}
+              </Link>
             ) : (
               <>
-                <Link to="/login" className="block text-sm text-white/50 hover:text-white py-1">{t('nav.signIn')}</Link>
-                <Link to="/register" className="block text-sm font-medium text-black bg-white rounded-full py-2.5 text-center">{t('nav.startBuilding')}</Link>
+                <Link to="/login" className="block text-sm text-[#555] hover:text-[#1a1615] py-1">
+                  {t('nav.signIn')}
+                </Link>
+                <Link to="/register" className="block text-sm font-semibold text-center bg-[#1a1615] text-white rounded-full py-2.5">
+                  {t('nav.startBuilding')}
+                </Link>
               </>
             )}
           </div>
@@ -139,95 +173,46 @@ function Nav({ ctaPath: _ctaPath, isAuthenticated }: { ctaPath: string; isAuthen
   );
 }
 
-// ─── HERO PHONE MOCKUP ─────────────────────────────────
-function HeroPhone() {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
-  const y = useTransform(scrollYProgress, [0, 1], [40, -40]);
+// ─── SHOWCASE DATA ─────────────────────────────────────
+const SHOWCASE_APPS = [
+  { name: 'FitTrack Pro', category: 'Fitness', time: '12 min', gradient: 'from-emerald-400 to-teal-500' },
+  { name: 'FoodDash', category: 'Delivery', time: '18 min', gradient: 'from-orange-400 to-red-500' },
+  { name: 'MindfulMe', category: 'Wellness', time: '8 min', gradient: 'from-purple-400 to-indigo-500' },
+  { name: 'ShopLocal', category: 'E-commerce', time: '22 min', gradient: 'from-blue-400 to-cyan-500' },
+  { name: 'StudyBuddy', category: 'Education', time: '15 min', gradient: 'from-amber-400 to-yellow-500' },
+  { name: 'PetCare', category: 'Lifestyle', time: '10 min', gradient: 'from-pink-400 to-rose-500' },
+];
 
-  return (
-    <motion.div ref={ref} style={{ y }} className="relative mx-auto w-[280px] sm:w-[300px]">
-      {/* Phone frame */}
-      <div className="relative bg-[#0a0a0a] rounded-[44px] border-[3px] border-white/[0.12] overflow-hidden shadow-[0_40px_100px_-20px_rgba(0,0,0,0.6)]">
-        {/* Dynamic island */}
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 w-[90px] h-[28px] bg-black rounded-full z-20" />
-        {/* Screen */}
-        <div className="pt-14 pb-6 px-4 min-h-[520px] bg-[#0f172a]">
-          {/* Header */}
-          <div className="mb-6">
-            <div className="h-[6px] rounded-full bg-white/20 w-1/3 mb-3" />
-            <div className="h-[4px] rounded-full bg-white/10 w-2/3" />
-          </div>
-          {/* Hero card */}
-          <div className="bg-white/[0.04] border border-white/[0.06] rounded-2xl p-4 mb-4">
-            <div className="h-[5px] rounded-full bg-white/15 w-3/4 mb-3" />
-            <div className="flex gap-2 mb-3">
-              <div className="h-14 flex-1 rounded-xl bg-white/[0.06]" />
-              <div className="h-14 flex-1 rounded-xl bg-white/[0.04]" />
-            </div>
-            <div className="h-[4px] rounded-full bg-white/[0.08] w-1/2" />
-          </div>
-          {/* List */}
-          <div className="space-y-3">
-            {[0.7, 0.5, 0.6, 0.4].map((w, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white/[0.04] flex-shrink-0" />
-                <div className="flex-1">
-                  <div className="h-[4px] rounded-full bg-white/[0.12] mb-1.5" style={{ width: `${w * 100}%` }} />
-                  <div className="h-[3px] rounded-full bg-white/[0.06] w-4/5" />
-                </div>
-              </div>
-            ))}
-          </div>
-          {/* Tab bar */}
-          <div className="flex justify-around mt-8 pt-4 border-t border-white/[0.04]">
-            {[true, false, false, false, false].map((active, i) => (
-              <div key={i} className={cn('w-5 h-5 rounded-lg', active ? 'bg-white/20' : 'bg-white/[0.05]')} />
-            ))}
-          </div>
-        </div>
-        {/* Home indicator */}
-        <div className="flex justify-center pb-2">
-          <div className="w-28 h-1 rounded-full bg-white/15" />
-        </div>
-      </div>
-    </motion.div>
-  );
-}
+// ─── FAQ DATA ──────────────────────────────────────────
+const FAQ_ITEMS = [
+  { q: 'Do I need coding experience?', a: 'No. But if you can code, you\'ll love the real code output. Every project is a standard Expo/React Native codebase you can open in any IDE.' },
+  { q: 'Is it really production-quality code?', a: 'Yes. Expo + React Native \u2014 the same stack used by companies like Shopify, Discord, and thousands of startups. StyleSheet.create, proper navigation, real state management.' },
+  { q: 'Can I edit the code myself?', a: 'Absolutely. Export to GitHub, open in VS Code or any IDE. It\'s your code \u2014 no lock-in, no proprietary format.' },
+  { q: 'What if the AI gets it wrong?', a: 'Just tell it. Every change is conversational. Say "make the button bigger" or "add a settings screen" and it updates instantly. You can also edit the code directly.' },
+  { q: 'How does App Store publishing work?', a: 'AppX uses EAS Build from Expo. Connect your Apple Developer account, and we handle the build, signing, and submission process.' },
+  { q: 'Will my app work on Android too?', a: 'Yes. React Native runs on both iOS and Android from the same codebase. Build once, ship everywhere.' },
+  { q: 'What can I build with this?', a: 'Anything from a simple habit tracker to a multi-screen marketplace with user auth, data storage, and real-time features. If React Native can do it, AppX can build it.' },
+];
 
-// ─── FEATURE ROW ───────────────────────────────────────
-function FeatureRow({ num, title, desc, delay = 0 }: { num: string; title: string; desc: string; delay?: number }) {
-  return (
-    <Reveal delay={delay} className="group">
-      <div className="flex items-start gap-6 sm:gap-10 py-8 border-b border-white/[0.08] group-hover:border-white/[0.15] transition-colors duration-500">
-        <span className="font-serif text-[32px] sm:text-[40px] text-white/25 leading-none flex-shrink-0 w-12 sm:w-16">{num}</span>
-        <div>
-          <h3 className="font-serif text-xl sm:text-2xl text-white mb-2">{title}</h3>
-          <p className="text-[15px] text-white/50 leading-relaxed max-w-lg">{desc}</p>
-        </div>
-      </div>
-    </Reveal>
-  );
-}
+// ─── COMPARISON DATA ───────────────────────────────────
+const COMPARISON_HEADERS = ['', 'AppX Pro', 'Freelance Dev', 'No-Code Tool'];
+const COMPARISON_ROWS = [
+  ['Cost', '$20/mo', '$5,000\u2013$50,000', '$30\u2013$300/mo'],
+  ['Time to App Store', 'Hours', 'Months', 'Never (web only)'],
+  ['Real native code', '\u2713', '\u2713', '\u2717'],
+  ['You own the code', '\u2713', '\u2713', '\u2717'],
+  ['App Store publishing', '\u2713', '\u2713', '\u2717'],
+];
 
-// ─── STEP ──────────────────────────────────────────────
-function Step({ num, word, desc, delay = 0 }: { num: string; word: string; desc: string; delay?: number }) {
-  return (
-    <Reveal delay={delay} className="text-center">
-      <div className="inline-flex items-center justify-center w-12 h-12 rounded-full border border-white/[0.12] bg-white/[0.04] mb-6">
-        <span className="font-sans text-xs font-semibold text-white/40">{num}</span>
-      </div>
-      <h3 className="font-serif text-3xl sm:text-4xl text-white mb-3">{word}</h3>
-      <p className="text-[15px] text-white/50 leading-relaxed max-w-[260px] mx-auto">{desc}</p>
-    </Reveal>
-  );
-}
+// ─── SOCIAL PROOF BRANDS ───────────────────────────────
+const BRAND_NAMES = ['TechCo', 'StartupHQ', 'AppWorks', 'DevStudio', 'LaunchPad', 'BuildFast'];
 
 // ─── LANDING PAGE ──────────────────────────────────────
 export default function Landing() {
   const { isAuthenticated } = useAuthStore();
   const { t } = useTranslation();
   const ctaPath = isAuthenticated ? '/dashboard' : '/register';
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const PLANS = [
     {
@@ -272,342 +257,512 @@ export default function Landing() {
     },
   ];
 
+  const USE_CASES = [
+    { icon: Briefcase, title: t('useCases.founders.title'), desc: t('useCases.founders.desc') },
+    { icon: Palette, title: t('useCases.designers.title'), desc: t('useCases.designers.desc') },
+    { icon: Terminal, title: t('useCases.developers.title'), desc: t('useCases.developers.desc') },
+    { icon: Building2, title: t('useCases.startups.title'), desc: t('useCases.startups.desc') },
+    { icon: GraduationCap, title: t('useCases.students.title'), desc: t('useCases.students.desc') },
+  ];
+
+  const FEATURES = [
+    { icon: FileCode, title: t('features.items.multiScreen.title'), desc: t('features.items.multiScreen.desc'), wide: true },
+    { icon: Smartphone, title: t('features.items.livePreview.title'), desc: t('features.items.livePreview.desc'), wide: false },
+    { icon: MessageSquare, title: t('features.items.chatDriven.title'), desc: t('features.items.chatDriven.desc'), wide: false },
+    { icon: Upload, title: t('features.items.publish.title'), desc: t('features.items.publish.desc'), wide: false },
+    { icon: Code2, title: t('features.items.realCode.title'), desc: t('features.items.realCode.desc'), wide: false },
+    { icon: Brain, title: t('features.items.gemini.title'), desc: t('features.items.gemini.desc'), wide: true },
+  ];
+
+  const HOW_IT_WORKS_STEPS = [
+    { num: '1', word: t('howItWorks.describe.word'), desc: t('howItWorks.describe.desc') },
+    { num: '2', word: t('howItWorks.generate.word'), desc: t('howItWorks.generate.desc') },
+    { num: '3', word: t('howItWorks.preview.word'), desc: t('howItWorks.preview.desc') },
+    { num: '4', word: t('howItWorks.refine.word'), desc: t('howItWorks.refine.desc') },
+    { num: '5', word: t('howItWorks.ship.word'), desc: t('howItWorks.ship.desc') },
+  ];
+
   return (
-    <div className="min-h-screen bg-black text-white antialiased overflow-x-hidden selection:bg-blue-500/30">
+    <div className="min-h-screen bg-[#faf8f6] text-[#1a1615] antialiased overflow-x-hidden font-sans">
       <style>{`
         @import url('${FONT_LINK}');
-        .font-serif { font-family: 'DM Serif Display', Georgia, serif; }
-        .font-sans { font-family: 'DM Sans', system-ui, -apple-system, sans-serif; }
+        .font-sans { font-family: 'Nunito', system-ui, sans-serif; }
+        body { font-family: 'Nunito', system-ui, sans-serif; }
+        @keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
       `}</style>
 
-      {/* Mesh gradient background — full page */}
-      <div className="fixed inset-0 z-0">
-        <MeshGradient
-          className="w-full h-full"
-          colors={["#000000", "#0a0a0a", "#1a1a1a", "#2a2a2a"]}
-          speed={0.8}
-        />
-        <div className="absolute inset-0 bg-black/40" />
-      </div>
+      <Nav ctaPath={ctaPath} isAuthenticated={isAuthenticated} />
 
-      {/* All content above the canvas */}
-      <div className="relative z-10">
-        <Nav ctaPath={ctaPath} isAuthenticated={isAuthenticated} />
-
-        {/* ═══════════════════════════════════════════════════
-            HERO — One bold statement. Nothing else.
-            ═══════════════════════════════════════════════════ */}
-        <section className="relative min-h-screen flex flex-col items-center justify-center px-6">
-          <div className="relative z-10 text-center max-w-4xl mx-auto">
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 1, delay: 0.2 }}
-              className="text-[13px] text-white/40 uppercase tracking-[0.3em] font-sans font-medium mb-8"
-            >
-              {t('hero.badge')}
-            </motion.p>
-
-            <motion.h1
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 1, delay: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-              className="font-serif text-[clamp(2.5rem,8vw,6.5rem)] leading-[0.95] tracking-[-0.02em] text-white"
-            >
-              {t('hero.titleLine1')}
-              <br />
-              <span className="text-white/60">{t('hero.titleLine2')}</span>
-            </motion.h1>
-
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.8, delay: 0.8 }}
-              className="font-sans text-lg sm:text-xl text-white/50 mt-8 mb-12 max-w-xl mx-auto leading-relaxed"
-            >
-              {t('hero.subtitle1')}
-              <br className="hidden sm:block" />
-              {t('hero.subtitle2')}
-            </motion.p>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 1.0 }}
-              className="max-w-2xl mx-auto"
-            >
-              <AppComposer />
-            </motion.div>
-          </div>
-
-          {/* Scroll hint */}
-          <motion.div
+      {/* ═══════════════════════════════════════════════════
+          SECTION 1: HERO
+          ═══════════════════════════════════════════════════ */}
+      <section className="relative pt-32 sm:pt-40 pb-20 sm:pb-28 px-6 bg-gradient-to-b from-[#d4e4f7] via-[#f0ece7] to-[#faf8f6]">
+        <div className="max-w-3xl mx-auto text-center">
+          <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 2, duration: 1 }}
-            className="absolute bottom-10 z-10"
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="text-xs font-semibold uppercase tracking-[0.25em] text-[#3b82f6] mb-6"
           >
-            <motion.div
-              animate={{ y: [0, 8, 0] }}
-              transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-              className="w-[1px] h-8 bg-white/20 mx-auto"
-            />
+            {t('hero.superTagline')}
+          </motion.p>
+
+          <motion.h1
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.9, delay: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="text-[clamp(2.5rem,7vw,5.5rem)] font-extrabold tracking-tight leading-[1.05]"
+          >
+            <span className="text-[#1a1615]">{t('hero.headline1')}</span>
+            <br />
+            <span className="text-[#999]">{t('hero.headline2')}</span>
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.8, delay: 0.7 }}
+            className="text-lg sm:text-xl text-[#555] mt-6 mb-10 max-w-2xl mx-auto leading-relaxed"
+          >
+            {t('hero.subheadline')}
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 1.0 }}
+            className="max-w-2xl mx-auto"
+          >
+            <AppComposer variant="light" />
           </motion.div>
-        </section>
 
-        {/* ═══════════════════════════════════════════════════
-            PRODUCT — The phone speaks for itself.
-            ═══════════════════════════════════════════════════ */}
-        <section className="py-32 sm:py-40 px-6">
-          <div className="max-w-[1000px] mx-auto">
-            <div className="grid md:grid-cols-2 gap-16 md:gap-24 items-center">
-              <div>
-                <Reveal>
-                  <p className="text-[11px] text-white/40 uppercase tracking-[0.25em] font-sans font-medium mb-6">{t('product.label')}</p>
-                </Reveal>
-                <Reveal delay={0.1}>
-                  <h2 className="font-serif text-4xl sm:text-5xl leading-[1.05] mb-6 text-white">
-                    {t('product.titleLine1')}
-                    <br />
-                    <span className="text-white/60">{t('product.titleLine2')}</span>
-                  </h2>
-                </Reveal>
-                <Reveal delay={0.2}>
-                  <p className="font-sans text-[15px] text-white/50 leading-relaxed max-w-md">
-                    {t('product.description')}
-                  </p>
-                </Reveal>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.8, delay: 1.3 }}
+            className="text-sm text-[#999] mt-6 text-center"
+          >
+            {t('hero.trustLine')}
+          </motion.p>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════
+          SECTION 2: SOCIAL PROOF BAR
+          ═══════════════════════════════════════════════════ */}
+      <section className="py-12 overflow-hidden">
+        <p className="text-sm text-[#999] text-center mb-8">{t('socialProof.title')}</p>
+        <div className="overflow-hidden">
+          <div className="flex" style={{ animation: 'scroll 30s linear infinite', width: 'max-content' }}>
+            {[...BRAND_NAMES, ...BRAND_NAMES].map((name, i) => (
+              <div
+                key={`${name}-${i}`}
+                className="flex-shrink-0 px-8 py-3 mx-3 rounded-full bg-gray-100 text-sm font-medium text-[#999]"
+              >
+                {name}
               </div>
-
-              <Reveal delay={0.3}>
-                <HeroPhone />
-              </Reveal>
-            </div>
+            ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* ═══════════════════════════════════════════════════
-            FEATURES — Numbered, editorial. One per row.
-            ═══════════════════════════════════════════════════ */}
-        <section id="features" className="py-24 sm:py-32 px-6">
-          <div className="max-w-[800px] mx-auto">
-            <div className="backdrop-blur-md bg-white/[0.05] border border-white/[0.12] rounded-2xl px-8 sm:px-12 py-12 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.4)]">
-              <Reveal>
-                <h2 className="font-serif text-4xl sm:text-5xl text-center mb-16 leading-[1.05] text-white">
-                  {t('features.title1')}
-                  <br />
-                  <span className="text-white/60">{t('features.title2')}</span>
-                </h2>
-              </Reveal>
-
-              <FeatureRow num="01" title={t('features.items.multiScreen.title')}
-                desc={t('features.items.multiScreen.desc')}
-                delay={0} />
-              <FeatureRow num="02" title={t('features.items.livePreview.title')}
-                desc={t('features.items.livePreview.desc')}
-                delay={0.05} />
-              <FeatureRow num="03" title={t('features.items.chatDriven.title')}
-                desc={t('features.items.chatDriven.desc')}
-                delay={0.1} />
-              <FeatureRow num="04" title={t('features.items.publish.title')}
-                desc={t('features.items.publish.desc')}
-                delay={0.15} />
-            </div>
-          </div>
-        </section>
-
-        {/* ═══════════════════════════════════════════════════
-            HOW IT WORKS — Three words. That's all you need.
-            ═══════════════════════════════════════════════════ */}
-        <section id="how-it-works" className="py-32 sm:py-40 px-6">
-          <div className="max-w-[900px] mx-auto">
-            <Reveal>
-              <p className="text-[11px] text-white/40 uppercase tracking-[0.3em] font-sans text-center mb-16">{t('howItWorks.label')}</p>
-            </Reveal>
-
-            <div className="backdrop-blur-md bg-white/[0.05] border border-white/[0.12] rounded-2xl px-8 py-14 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.4)]">
-              <div className="grid md:grid-cols-3 gap-16 md:gap-8">
-                <Step num="01" word={t('howItWorks.describe.word')} desc={t('howItWorks.describe.desc')} delay={0} />
-                <Step num="02" word={t('howItWorks.generate.word')} desc={t('howItWorks.generate.desc')} delay={0.15} />
-                <Step num="03" word={t('howItWorks.ship.word')} desc={t('howItWorks.ship.desc')} delay={0.3} />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ═══════════════════════════════════════════════════
-            STATEMENT — A single powerful line.
-            ═══════════════════════════════════════════════════ */}
-        <section className="py-32 sm:py-40 px-6">
-          <Reveal className="max-w-[900px] mx-auto text-center">
-            <h2 className="font-serif text-[clamp(2rem,6vw,5rem)] leading-[1] tracking-[-0.02em] text-white">
-              <span className="text-white/60">{t('statement.pre')} </span>
-              {t('statement.highlight')}
-              <span className="text-white/60"> {t('statement.mid')}</span>
-              <br />
-              <span className="text-white/60">{t('statement.end')}</span>
-            </h2>
+      {/* ═══════════════════════════════════════════════════
+          SECTION 3: WHAT YOU GET
+          ═══════════════════════════════════════════════════ */}
+      <section className="py-20 sm:py-28 px-6">
+        <div className="max-w-[1000px] mx-auto text-center">
+          <Reveal>
+            <SectionLabel>{t('whatYouGet.label')}</SectionLabel>
           </Reveal>
-        </section>
+          <Reveal delay={0.05}>
+            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-12">{t('whatYouGet.headline')}</h2>
+          </Reveal>
 
-        {/* ═══════════════════════════════════════════════════
-            PRICING — Clean and decisive.
-            ═══════════════════════════════════════════════════ */}
-        <section id="pricing" className="py-24 sm:py-32 px-6">
-          <div className="max-w-[960px] mx-auto">
-            <Reveal>
-              <h2 className="font-serif text-4xl sm:text-5xl text-center mb-4 text-white">{t('pricing.title')}</h2>
-            </Reveal>
-            <Reveal delay={0.1}>
-              <p className="font-sans text-[15px] text-white/40 text-center mb-16">{t('pricing.subtitle')}</p>
-            </Reveal>
-
-            <div className="grid md:grid-cols-3 gap-4">
-              {PLANS.map((plan, i) => (
-                <Reveal key={plan.name} delay={i * 0.1}>
-                  <div className={cn(
-                    'relative rounded-2xl p-7 flex flex-col h-full transition-all duration-300',
-                    plan.highlight
-                      ? 'backdrop-blur-md bg-white/[0.08] border border-blue-500/40 shadow-[0_0_30px_-5px_rgba(59,130,246,0.25),0_8px_40px_-12px_rgba(0,0,0,0.4)] hover:shadow-[0_0_40px_-5px_rgba(59,130,246,0.35)]'
-                      : 'backdrop-blur-md bg-white/[0.05] border border-white/[0.12] shadow-[0_8px_40px_-12px_rgba(0,0,0,0.4)] hover:border-white/[0.18]'
-                  )}>
-                    {plan.highlight && (
-                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 text-white text-[10px] font-sans font-bold tracking-wide uppercase">
-                        {t('pricing.mostPopular')}
-                      </span>
-                    )}
-
-                    <p className="font-sans text-sm font-medium text-white/40 mb-5">{plan.name}</p>
-
-                    <div className="flex items-baseline gap-1 mb-1">
-                      <span className="font-serif text-[42px] text-white leading-none">{plan.price}</span>
-                      {plan.period && <span className="font-sans text-sm text-white/40">{plan.period}</span>}
-                    </div>
-                    <p className="font-sans text-[12px] text-white/40 mb-8">{plan.credits}</p>
-
-                    <ul className="space-y-3 flex-1 mb-8">
-                      {plan.features.map((f) => (
-                        <li key={f} className="flex items-start gap-3 font-sans text-[13px] text-white/60">
-                          <Check className="w-3.5 h-3.5 text-white/40 mt-0.5 flex-shrink-0" />
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-
-                    <Link
-                      to={ctaPath}
-                      className={cn(
-                        'block text-center py-3 rounded-full font-sans text-[13px] font-semibold transition-all duration-300',
-                        plan.highlight
-                          ? 'bg-white text-black hover:bg-white/90'
-                          : 'bg-white/[0.06] text-white/60 hover:bg-white/[0.10] border border-white/[0.08]'
-                      )}
-                    >
-                      {plan.cta}
-                    </Link>
+          <Reveal delay={0.1}>
+            <div className="bg-white rounded-[32px] shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-8 sm:p-12">
+              <div className="grid md:grid-cols-3 gap-10">
+                <div className="text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-5">
+                    <Code2 className="w-6 h-6 text-[#3b82f6]" />
                   </div>
-                </Reveal>
-              ))}
+                  <h3 className="text-lg font-bold mb-2">{t('whatYouGet.realCode.title')}</h3>
+                  <p className="text-[15px] text-[#555] leading-relaxed">{t('whatYouGet.realCode.desc')}</p>
+                </div>
+                <div className="text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-5">
+                    <Smartphone className="w-6 h-6 text-[#3b82f6]" />
+                  </div>
+                  <h3 className="text-lg font-bold mb-2">{t('whatYouGet.phoneTest.title')}</h3>
+                  <p className="text-[15px] text-[#555] leading-relaxed">{t('whatYouGet.phoneTest.desc')}</p>
+                </div>
+                <div className="text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-5">
+                    <Rocket className="w-6 h-6 text-[#3b82f6]" />
+                  </div>
+                  <h3 className="text-lg font-bold mb-2">{t('whatYouGet.appStore.title')}</h3>
+                  <p className="text-[15px] text-[#555] leading-relaxed">{t('whatYouGet.appStore.desc')}</p>
+                </div>
+              </div>
             </div>
-          </div>
-        </section>
+          </Reveal>
+        </div>
+      </section>
 
-        {/* ═══════════════════════════════════════════════════
-            BOTTOM CTA — One final moment.
-            ═══════════════════════════════════════════════════ */}
-        <section className="py-32 sm:py-40 px-6">
-          <Reveal className="text-center">
-            <div className="max-w-2xl mx-auto backdrop-blur-md bg-white/[0.05] border border-white/[0.12] rounded-2xl px-8 py-16 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.4)]">
-              <h2 className="font-serif text-4xl sm:text-5xl md:text-6xl mb-8 leading-[1] text-white">
-                {t('cta.title1')}
-                <br />
-                {t('cta.title2')}
+      {/* ═══════════════════════════════════════════════════
+          SECTION 4: HOW IT WORKS
+          ═══════════════════════════════════════════════════ */}
+      <section id="how-it-works" className="py-20 sm:py-28 px-6">
+        <div className="max-w-[1000px] mx-auto text-center">
+          <Reveal>
+            <SectionLabel>{t('howItWorks.label')}</SectionLabel>
+          </Reveal>
+
+          <Reveal delay={0.1}>
+            <div className="bg-white rounded-[32px] shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-8 sm:p-12">
+              <div className="flex flex-wrap justify-center gap-6 sm:gap-4">
+                {HOW_IT_WORKS_STEPS.map((step, i) => (
+                  <Reveal key={step.num} delay={i * 0.08}>
+                    <div className="flex flex-col items-center text-center w-[140px] sm:w-[160px]">
+                      <div className="w-12 h-12 rounded-full border-2 border-gray-200 flex items-center justify-center mb-4">
+                        <span className="text-sm font-bold text-[#999]">{step.num}</span>
+                      </div>
+                      <h3 className="text-xl font-bold mb-1">{step.word}</h3>
+                      <p className="text-[13px] text-[#555] leading-relaxed">{step.desc}</p>
+                    </div>
+                  </Reveal>
+                ))}
+              </div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════
+          SECTION 5: USE CASES
+          ═══════════════════════════════════════════════════ */}
+      <section className="py-20 sm:py-28 px-6">
+        <div className="max-w-[1200px] mx-auto text-center">
+          <Reveal>
+            <SectionLabel>{t('useCases.label')}</SectionLabel>
+          </Reveal>
+          <Reveal delay={0.05}>
+            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-12">{t('useCases.headline')}</h2>
+          </Reveal>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {USE_CASES.map((uc, i) => (
+              <Reveal key={uc.title} delay={i * 0.08}>
+                <div className={cn(
+                  'bg-white rounded-[24px] shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-7 h-full hover:shadow-[0_4px_30px_rgba(0,0,0,0.08)] transition-shadow text-left',
+                  i === 4 && 'sm:col-span-2 lg:col-span-1 lg:mx-auto lg:max-w-[380px]'
+                )}>
+                  <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center mb-4">
+                    <uc.icon className="w-5 h-5 text-[#3b82f6]" />
+                  </div>
+                  <h3 className="text-lg font-bold mb-2">{uc.title}</h3>
+                  <p className="text-[15px] text-[#555] leading-relaxed">{uc.desc}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════
+          SECTION 6: FEATURES BENTO GRID
+          ═══════════════════════════════════════════════════ */}
+      <section id="features" className="py-20 sm:py-28 px-6">
+        <div className="max-w-[1200px] mx-auto text-center">
+          <Reveal>
+            <SectionLabel>{t('features.label')}</SectionLabel>
+          </Reveal>
+          <Reveal delay={0.05}>
+            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-3">{t('features.headline')}</h2>
+          </Reveal>
+          <Reveal delay={0.08}>
+            <p className="text-[#555] text-lg mb-12 max-w-xl mx-auto">{t('features.subheadline')}</p>
+          </Reveal>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {FEATURES.map((feat, i) => (
+              <Reveal key={feat.title} delay={i * 0.06} className={feat.wide ? 'md:col-span-2' : ''}>
+                <div className="bg-white rounded-[24px] shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-7 h-full text-left">
+                  <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center mb-4">
+                    <feat.icon className="w-5 h-5 text-[#3b82f6]" />
+                  </div>
+                  <h3 className="text-lg font-bold mb-2">{feat.title}</h3>
+                  <p className="text-[15px] text-[#555] leading-relaxed">{feat.desc}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════
+          SECTION 7: APP SHOWCASE GALLERY
+          ═══════════════════════════════════════════════════ */}
+      <section id="showcase" className="py-20 sm:py-28 px-6">
+        <div className="max-w-[1200px] mx-auto text-center">
+          <Reveal>
+            <SectionLabel>{t('showcase.label')}</SectionLabel>
+          </Reveal>
+          <Reveal delay={0.05}>
+            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-12">{t('showcase.headline')}</h2>
+          </Reveal>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {SHOWCASE_APPS.map((app, i) => (
+              <Reveal key={app.name} delay={i * 0.06}>
+                <div className="bg-white rounded-[24px] shadow-[0_2px_20px_rgba(0,0,0,0.04)] overflow-hidden hover:shadow-[0_4px_30px_rgba(0,0,0,0.08)] transition-shadow">
+                  <div className={`h-40 bg-gradient-to-br ${app.gradient} flex items-center justify-center`}>
+                    <Smartphone className="w-12 h-12 text-white/40" />
+                  </div>
+                  <div className="p-5">
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="font-bold">{app.name}</h3>
+                      <span className="text-xs text-[#999]">Built in {app.time}</span>
+                    </div>
+                    <span className="text-xs font-medium text-[#3b82f6] bg-blue-50 px-2.5 py-1 rounded-full">{app.category}</span>
+                  </div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════
+          SECTION 8: PRICING
+          ═══════════════════════════════════════════════════ */}
+      <section id="pricing" className="py-20 sm:py-28 px-6">
+        <div className="max-w-[1000px] mx-auto text-center">
+          <Reveal>
+            <SectionLabel>{t('nav.pricing')}</SectionLabel>
+          </Reveal>
+          <Reveal delay={0.05}>
+            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-3">{t('pricing.title')}</h2>
+          </Reveal>
+          <Reveal delay={0.08}>
+            <p className="text-[#555] text-lg mb-12 max-w-xl mx-auto">{t('pricing.subtitle')}</p>
+          </Reveal>
+
+          <div className="grid md:grid-cols-3 gap-5">
+            {PLANS.map((plan, i) => (
+              <Reveal key={plan.name} delay={i * 0.1}>
+                <div className={cn(
+                  'relative bg-white rounded-[24px] shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-7 flex flex-col h-full text-left',
+                  plan.highlight && 'ring-2 ring-[#3b82f6]'
+                )}>
+                  {plan.highlight && (
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-[#3b82f6] text-white text-[10px] font-bold tracking-wide uppercase">
+                      {t('pricing.mostPopular')}
+                    </span>
+                  )}
+
+                  <p className="text-sm font-medium text-[#999] mb-5">{plan.name}</p>
+
+                  <div className="flex items-baseline gap-1 mb-1">
+                    <span className="text-[42px] font-extrabold text-[#1a1615] leading-none">{plan.price}</span>
+                    {plan.period && <span className="text-sm text-[#999]">{plan.period}</span>}
+                  </div>
+                  <p className="text-[12px] text-[#999] mb-8">{plan.credits}</p>
+
+                  <ul className="space-y-3 flex-1 mb-8">
+                    {plan.features.map((f) => (
+                      <li key={f} className="flex items-start gap-3 text-[13px] text-[#555]">
+                        <Check className="w-3.5 h-3.5 text-[#3b82f6] mt-0.5 flex-shrink-0" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Link
+                    to={ctaPath}
+                    className={cn(
+                      'block text-center py-3 rounded-full text-[13px] font-semibold transition-colors',
+                      plan.highlight
+                        ? 'bg-[#3b82f6] text-white hover:bg-[#2563eb]'
+                        : 'bg-gray-100 text-[#1a1615] hover:bg-gray-200'
+                    )}
+                  >
+                    {plan.cta}
+                  </Link>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+
+          {/* ═══════════════════════════════════════════════
+              SECTION 9: COMPARISON TABLE
+              ═══════════════════════════════════════════════ */}
+          <div className="mt-16">
+            <Reveal>
+              <div className="bg-white rounded-[24px] shadow-[0_2px_20px_rgba(0,0,0,0.04)] overflow-hidden">
+                <h3 className="text-2xl font-extrabold p-7 pb-0">{t('comparison.title')}</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm mt-4">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        {COMPARISON_HEADERS.map((header, i) => (
+                          <th key={i} className={cn(
+                            'px-6 py-3 text-sm font-semibold',
+                            i === 0 ? 'text-left' : 'text-center'
+                          )}>
+                            {header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {COMPARISON_ROWS.map((row, ri) => (
+                        <tr key={ri} className="border-t border-gray-100">
+                          {row.map((cell, ci) => (
+                            <td key={ci} className={cn(
+                              'px-6 py-4',
+                              ci === 0 ? 'font-semibold text-left' : 'text-center',
+                              ci === 1 && cell !== '\u2717' && 'text-emerald-600 font-semibold',
+                              cell === '\u2713' && ci !== 1 && 'text-emerald-600',
+                              cell === '\u2717' && 'text-red-400'
+                            )}>
+                              {cell}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </Reveal>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════
+          SECTION 10: FAQ
+          ═══════════════════════════════════════════════════ */}
+      <section className="py-20 sm:py-28 px-6">
+        <div className="max-w-[800px] mx-auto">
+          <Reveal>
+            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-12 text-center">{t('faq.headline')}</h2>
+          </Reveal>
+
+          <div>
+            {FAQ_ITEMS.map((item, i) => (
+              <div key={i} className="border-b border-gray-100">
+                <button
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  className="w-full flex items-center justify-between py-5 text-left"
+                >
+                  <span className="text-[15px] font-semibold pr-4">{item.q}</span>
+                  <ChevronDown className={cn(
+                    'w-5 h-5 text-[#999] transition-transform flex-shrink-0',
+                    openFaq === i && 'rotate-180'
+                  )} />
+                </button>
+                <AnimatePresence>
+                  {openFaq === i && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="overflow-hidden"
+                    >
+                      <p className="text-[15px] text-[#555] leading-relaxed pb-5">{item.a}</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════
+          SECTION 11: FINAL CTA
+          ═══════════════════════════════════════════════════ */}
+      <section className="py-20 sm:py-28 px-6">
+        <div className="max-w-[800px] mx-auto">
+          <Reveal>
+            <div className="bg-[#1a1615] rounded-[32px] px-8 sm:px-16 py-16 text-center">
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-2 tracking-tight">
+                {t('cta.headline')}
               </h2>
+              <p className="text-xl text-white/50 mb-4">{t('cta.sub')}</p>
+              <p className="text-white/40 mb-8 max-w-md mx-auto">{t('cta.desc')}</p>
               <Link
                 to={ctaPath}
-                className="inline-flex items-center gap-3 px-8 py-4 rounded-full bg-white text-black font-sans text-sm font-semibold hover:bg-white/90 transition-all duration-300 group"
+                className="bg-white text-[#1a1615] rounded-full px-8 py-4 font-semibold inline-flex items-center gap-2 hover:bg-white/90 transition-colors group"
               >
                 {t('cta.button')}
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
               </Link>
+              <div>
+                <a href="#showcase" className="text-white/40 hover:text-white/60 text-sm mt-4 inline-block transition-colors">
+                  {t('cta.secondary')}
+                </a>
+              </div>
             </div>
           </Reveal>
-        </section>
+        </div>
+      </section>
 
-        {/* ═══════════════════════════════════════════════════
-            FOOTER — Quiet. Respectful.
-            ═══════════════════════════════════════════════════ */}
-        <footer className="border-t border-white/[0.08] py-16 px-6 bg-black">
-          <div className="max-w-[1000px] mx-auto">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-10 mb-14">
-              <div className="col-span-2 md:col-span-1">
-                <Link to="/" className="flex items-center gap-2.5 mb-4">
-                  <div className="w-8 h-8 rounded-lg backdrop-blur-md bg-white/[0.06] border border-white/[0.1] flex items-center justify-center p-1.5">
-                    <img src="/logo.png" alt="AppX" className="w-full h-full invert opacity-70" />
-                  </div>
-                  <span className="font-sans font-semibold text-sm text-white">AppX</span>
-                </Link>
-                <p className="font-sans text-[12px] text-white/40 leading-relaxed max-w-[180px]">
-                  {t('footer.tagline')}
-                </p>
-              </div>
-
-              <FooterCol title={t('footer.product')} items={[
-                { label: t('nav.features'), href: '#features' },
-                { label: t('nav.pricing'), href: '#pricing' },
-                { label: t('footer.changelog'), to: '/changelog' },
-              ]} />
-              <FooterCol title={t('footer.developers')} items={[
-                { label: t('footer.documentation'), to: '/docs' },
-                { label: t('footer.apiReference'), to: '/docs' },
-                { label: t('footer.status'), to: '/docs' },
-              ]} />
-              <FooterCol title={t('footer.company')} items={[
-                { label: t('footer.about'), to: '/about' },
-                { label: t('footer.blog'), to: '/blog' },
-                { label: t('footer.contact'), to: '/pricing' },
-              ]} />
-              <FooterCol title={t('footer.legal')} items={[
-                { label: t('footer.terms'), to: '/terms' },
-                { label: t('footer.privacy'), to: '/privacy' },
-              ]} />
+      {/* ═══════════════════════════════════════════════════
+          SECTION 12: FOOTER
+          ═══════════════════════════════════════════════════ */}
+      <footer className="bg-[#f0ece7] py-16 px-6">
+        <div className="max-w-[1000px] mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-10 mb-14">
+            <div className="col-span-2 md:col-span-1">
+              <Link to="/" className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center p-1.5">
+                  <img src="/logo.png" alt="AppX" className="w-full h-full" />
+                </div>
+                <span className="font-semibold text-sm text-[#1a1615]">AppX</span>
+              </Link>
+              <p className="text-sm text-[#999] leading-relaxed max-w-[180px]">
+                {t('footer.tagline')}
+              </p>
             </div>
 
-            <div className="pt-8 border-t border-white/[0.08] flex flex-col sm:flex-row items-center justify-between gap-4">
-              <p className="font-sans text-[11px] text-white/30">&copy; 2026 AppX Inc.</p>
-              <div className="flex items-center gap-4 text-white/30">
-                <a href="https://github.com/appx" target="_blank" rel="noopener noreferrer" className="hover:text-white/60 transition-colors">
-                  <Github className="w-4 h-4" />
-                </a>
-                <a href="https://twitter.com/appx" target="_blank" rel="noopener noreferrer" className="hover:text-white/60 transition-colors">
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                  </svg>
-                </a>
-              </div>
+            <FooterCol title={t('footer.product')} items={[
+              { label: t('nav.features'), href: '#features' },
+              { label: t('nav.pricing'), href: '#pricing' },
+              { label: t('footer.changelog'), to: '/changelog' },
+            ]} />
+            <FooterCol title={t('footer.developers')} items={[
+              { label: t('footer.documentation'), to: '/docs' },
+              { label: t('footer.apiReference'), to: '/docs' },
+              { label: t('footer.status'), to: '/docs' },
+            ]} />
+            <FooterCol title={t('footer.company')} items={[
+              { label: t('footer.about'), to: '/about' },
+              { label: t('footer.blog'), to: '/blog' },
+              { label: t('footer.contact'), to: '/pricing' },
+            ]} />
+            <FooterCol title={t('footer.legal')} items={[
+              { label: t('footer.terms'), to: '/terms' },
+              { label: t('footer.privacy'), to: '/privacy' },
+            ]} />
+          </div>
+
+          <div className="pt-8 border-t border-black/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-[11px] text-[#999]">&copy; 2026 AppX Inc.</p>
+            <div className="flex items-center gap-4 text-[#999]">
+              <a href="https://github.com/appx" target="_blank" rel="noopener noreferrer" className="hover:text-[#1a1615] transition-colors">
+                <Github className="w-4 h-4" />
+              </a>
+              <a href="https://twitter.com/appx" target="_blank" rel="noopener noreferrer" className="hover:text-[#1a1615] transition-colors">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                </svg>
+              </a>
             </div>
           </div>
-        </footer>
-      </div>
-    </div>
-  );
-}
-
-function FooterCol({ title, items }: { title: string; items: { label: string; to?: string; href?: string }[] }) {
-  return (
-    <div>
-      <p className="font-sans text-[10px] text-white/30 uppercase tracking-[0.2em] font-medium mb-4">{title}</p>
-      <ul className="space-y-2.5">
-        {items.map((item) => (
-          <li key={item.label}>
-            {item.href ? (
-              <a href={item.href} className="font-sans text-[12px] text-white/40 hover:text-white transition-colors duration-300">{item.label}</a>
-            ) : (
-              <Link to={item.to!} className="font-sans text-[12px] text-white/40 hover:text-white transition-colors duration-300">{item.label}</Link>
-            )}
-          </li>
-        ))}
-      </ul>
+        </div>
+      </footer>
     </div>
   );
 }

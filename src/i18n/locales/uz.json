@@ -3,70 +3,131 @@
     "features": "Imkoniyatlar",
     "howItWorks": "Qanday ishlaydi",
     "pricing": "Tariflar",
+    "showcase": "Showcase",
     "signIn": "Kirish",
     "startBuilding": "Boshlash",
     "dashboard": "Boshqaruv"
   },
   "hero": {
-    "badge": "AI mobil muhandis",
-    "titleLine1": "Tasvirlab bering.",
-    "titleLine2": "Biz yaratamiz.",
-    "subtitle1": "Bitta suhbatdan tayyor React Native ilovalar.",
-    "subtitle2": "Telefoningizda darhol sinab ko'ring.",
+    "superTagline": "The only AI that ships to the App Store",
+    "headline1": "Your app idea.",
+    "headline2": "In the App Store by tomorrow.",
+    "subheadline": "Describe what you want in plain English. AppX writes production React Native code, lets you test on your real phone in seconds, and publishes to App Store & Google Play — no engineers needed.",
+    "trustLine": "Free to start · No credit card required",
     "inputPlaceholder": "Yaratmoqchi bo'lgan mobil ilovangizni tasvirlab bering..."
   },
-  "product": {
-    "label": "Siz nima olasiz",
-    "titleLine1": "Prototip emas.",
-    "titleLine2": "Haqiqiy ilova.",
-    "description": "AppX ishlab chiqarishga tayyor React Native kod yaratadi — navigatsiya, holat boshqaruvi va ma'lumotlar oqimi bilan ko'p ekranli ilovalar. QR kodni skanerlang, haqiqiy telefoningizda sinab ko'ring."
+  "socialProof": {
+    "title": "Trusted by startups, founders and indie hackers"
+  },
+  "whatYouGet": {
+    "label": "What you get",
+    "headline": "Not a mockup. A real app.",
+    "realCode": {
+      "title": "Real React Native Code",
+      "desc": "Not drag-and-drop output. Every app is a real Expo project — inspect it, edit it, hand it to a developer, own it forever."
+    },
+    "phoneTest": {
+      "title": "Test on Your Actual Phone",
+      "desc": "Scan a QR code. Your app is live on your device with real performance, real haptics, real everything. Not a simulator."
+    },
+    "appStore": {
+      "title": "Publish to App Store & Google Play",
+      "desc": "Hit one button. AppX handles the build, signing, and submission through EAS. Your app goes live — without Xcode or Android Studio."
+    }
   },
   "features": {
-    "title1": "Kerakli hamma narsa",
-    "title2": "ishga tushirish uchun.",
+    "label": "Features",
+    "headline": "Built for builders, powered by AI",
+    "subheadline": "Everything you need to go from idea to App Store",
     "items": {
       "multiScreen": {
-        "title": "Ko'p ekranli generatsiya",
-        "desc": "Butun ilovani tasvirlab bering. Navigatsiya, holat boshqaruvi va ma'lumotlar oqimi bilan to'liq loyiha oling."
+        "title": "Multi-Screen Generation",
+        "desc": "Describe an entire app. Get a complete project with navigation, state management, and data flow — not just a single screen."
       },
       "livePreview": {
-        "title": "Qurilmada jonli ko'rish",
-        "desc": "QR kodni skanerlang. Telefoningizda soniyalarda sinab ko'ring. Haqiqiy qurilma, haqiqiy ishlash."
+        "title": "Live Device Preview",
+        "desc": "Scan a QR code. Test on your phone in seconds. Real device, real performance, real haptics."
       },
       "chatDriven": {
-        "title": "Chat orqali tahrirlash",
-        "desc": "Har qanday ekranni suhbat orqali yaxshilang. Tartib, ranglar, mantiqni o'zgartiring."
+        "title": "Chat-Driven Iteration",
+        "desc": "Refine any screen conversationally. Change layouts, colors, logic — like pair-programming with a senior engineer."
       },
       "publish": {
-        "title": "Bir bosishda nashr",
-        "desc": "Vebga darhol joylashtiring. GitHub ga eksport qiling. EAS bilan yig'ing. App Store va Google Play ga joylashtiring."
+        "title": "One-Click Publish",
+        "desc": "Deploy to the web instantly. Export to GitHub. Build with EAS. Ship to App Store and Google Play."
+      },
+      "realCode": {
+        "title": "Real Code You Own",
+        "desc": "Every project is a real Expo/React Native codebase. Export to GitHub, hand off to a dev team. No lock-in. Ever."
+      },
+      "gemini": {
+        "title": "Powered by Gemini 2.5 Pro",
+        "desc": "AppX uses Google's most capable coding model to plan, write, and validate your app's code — so what you get actually works."
       }
     }
   },
   "howItWorks": {
     "label": "Qanday ishlaydi",
     "describe": {
-      "word": "Tasvirlang",
-      "desc": "Nima yaratmoqchi ekanligingizni ayting. Oddiy tilda. Hammasi shu."
+      "word": "Describe",
+      "desc": "Write your idea in plain English. As much or as little detail as you want."
     },
     "generate": {
-      "word": "Generatsiya",
-      "desc": "AI ishlab chiqarishga tayyor React Native kod yozadi. Real vaqtda kuzating."
+      "word": "Generate",
+      "desc": "AI plans your screens, writes navigation logic, and generates real React Native code — live."
+    },
+    "preview": {
+      "word": "Preview",
+      "desc": "Scan a QR code with Expo Go. Your app is on your phone in under 30 seconds."
+    },
+    "refine": {
+      "word": "Refine",
+      "desc": "\"Change the color to navy.\" Every change is applied instantly and pushed to your phone."
     },
     "ship": {
-      "word": "Ishga tushirish",
-      "desc": "Telefoningizda sinang. GitHub ga push qiling. Storlarga joylashtiring."
+      "word": "Ship",
+      "desc": "One click to deploy. One build to submit to App Store and Google Play. You're live."
     }
   },
-  "statement": {
-    "pre": "G'oyadan",
-    "highlight": "App Store",
-    "mid": "gacha soatlarda,",
-    "end": "oylarda emas."
+  "useCases": {
+    "label": "Who it's for",
+    "headline": "Built for anyone with an app idea",
+    "founders": {
+      "title": "Entrepreneurs & Founders",
+      "desc": "Validate your idea before spending $50K on a dev team. Build an MVP, test with real users, raise funding with a working product."
+    },
+    "designers": {
+      "title": "Designers",
+      "desc": "Your Figma mockups deserve to be real apps. Turn designs into interactive, shippable products without writing code."
+    },
+    "developers": {
+      "title": "Developers",
+      "desc": "Skip the boilerplate. Scaffold a full multi-screen app in 2 minutes, then customize the real React Native code."
+    },
+    "startups": {
+      "title": "Startups & Agencies",
+      "desc": "Ship MVPs in days. Prototype for clients in hours. Multiply your output without multiplying headcount."
+    },
+    "students": {
+      "title": "Students & Side Projects",
+      "desc": "That app idea you've had for two years? Build it this weekend. For free."
+    }
+  },
+  "showcase": {
+    "label": "Showcase",
+    "headline": "See what people are building",
+    "apps": [
+      { "name": "FitTrack Pro", "category": "Fitness", "time": "12 min" },
+      { "name": "FoodDash", "category": "Delivery", "time": "18 min" },
+      { "name": "MindfulMe", "category": "Wellness", "time": "8 min" },
+      { "name": "ShopLocal", "category": "E-commerce", "time": "22 min" },
+      { "name": "StudyBuddy", "category": "Education", "time": "15 min" },
+      { "name": "PetCare", "category": "Lifestyle", "time": "10 min" }
+    ]
   },
   "pricing": {
-    "title": "Oddiy tariflar",
-    "subtitle": "Bepul boshlang. Tayyor bo'lganda yangilang.",
+    "title": "Simple plans for serious work",
+    "subtitle": "Start free. Build your first app today. Upgrade when you're ready to ship.",
     "mostPopular": "Mashhur",
     "creditsPerMonth": "kredit / oy",
     "free": {
@@ -98,10 +159,35 @@
       "dedicatedSupport": "Shaxsiy yordam"
     }
   },
+  "comparison": {
+    "title": "Why AppX?",
+    "headers": ["", "AppX Pro", "Freelance Dev", "No-Code Tool"],
+    "rows": {
+      "cost": ["Cost", "$20/mo", "$5,000–$50,000", "$30–$300/mo"],
+      "time": ["Time to App Store", "Hours", "Months", "Never (web only)"],
+      "native": ["Real native code", "✓", "✓", "✗"],
+      "ownCode": ["You own the code", "✓", "✓", "✗"],
+      "appStore": ["App Store publishing", "✓", "✓", "✗"]
+    }
+  },
+  "faq": {
+    "headline": "Frequently asked questions",
+    "items": [
+      { "q": "Do I need coding experience?", "a": "No. But if you can code, you'll love the real code output. Every project is a standard Expo/React Native codebase you can open in any IDE." },
+      { "q": "Is it really production-quality code?", "a": "Yes. Expo + React Native — the same stack used by companies like Shopify, Discord, and thousands of startups. StyleSheet.create, proper navigation, real state management." },
+      { "q": "Can I edit the code myself?", "a": "Absolutely. Export to GitHub, open in VS Code or any IDE. It's your code — no lock-in, no proprietary format." },
+      { "q": "What if the AI gets it wrong?", "a": "Just tell it. Every change is conversational. Say \"make the button bigger\" or \"add a settings screen\" and it updates instantly. You can also edit the code directly." },
+      { "q": "How does App Store publishing work?", "a": "AppX uses EAS Build from Expo. Connect your Apple Developer account, and we handle the build, signing, and submission process." },
+      { "q": "Will my app work on Android too?", "a": "Yes. React Native runs on both iOS and Android from the same codebase. Build once, ship everywhere." },
+      { "q": "What can I build with this?", "a": "Anything from a simple habit tracker to a multi-screen marketplace with user auth, data storage, and real-time features. If React Native can do it, AppX can build it." }
+    ]
+  },
   "cta": {
-    "title1": "Keyingi ilovangiz",
-    "title2": "bitta xabardan boshlanadi.",
-    "button": "Bepul boshlash"
+    "headline": "Your idea deserves to be in the App Store.",
+    "sub": "Not stuck in a doc somewhere.",
+    "desc": "Join thousands of founders, designers, and builders who shipped their apps with AppX. Start free — no credit card, no code, no waiting.",
+    "button": "Bepul boshlash",
+    "secondary": "See what people are building"
   },
   "footer": {
     "tagline": "Mobil ilovalar yaratish uchun AI platforma.",

@@ -3,31 +3,46 @@
     "features": "Features",
     "howItWorks": "How it works",
     "pricing": "Pricing",
+    "showcase": "Showcase",
     "signIn": "Sign in",
     "startBuilding": "Start Building",
     "dashboard": "Dashboard"
   },
   "hero": {
-    "badge": "The AI Mobile Engineer",
-    "titleLine1": "Describe it.",
-    "titleLine2": "We build it.",
-    "subtitle1": "Production React Native apps from a single conversation.",
-    "subtitle2": "Test on your phone instantly.",
+    "superTagline": "The only AI that ships to the App Store",
+    "headline1": "Your app idea.",
+    "headline2": "In the App Store by tomorrow.",
+    "subheadline": "Describe what you want in plain English. AppX writes production React Native code, lets you test on your real phone in seconds, and publishes to App Store & Google Play \u2014 no engineers needed.",
+    "trustLine": "Free to start \u00b7 No credit card required",
     "inputPlaceholder": "Describe the mobile app you want to build..."
   },
-  "product": {
+  "socialProof": {
+    "title": "Trusted by startups, founders and indie hackers"
+  },
+  "whatYouGet": {
     "label": "What you get",
-    "titleLine1": "Not a prototype.",
-    "titleLine2": "A real app.",
-    "description": "AppX generates production React Native code — multi-screen apps with navigation, state management, and data flow. Scan a QR code, test on your actual phone. Not a mockup. Not a simulator."
+    "headline": "Not a mockup. A real app.",
+    "realCode": {
+      "title": "Real React Native Code",
+      "desc": "Not drag-and-drop output. Every app is a real Expo project \u2014 inspect it, edit it, hand it to a developer, own it forever."
+    },
+    "phoneTest": {
+      "title": "Test on Your Actual Phone",
+      "desc": "Scan a QR code. Your app is live on your device with real performance, real haptics, real everything. Not a simulator."
+    },
+    "appStore": {
+      "title": "Publish to App Store & Google Play",
+      "desc": "Hit one button. AppX handles the build, signing, and submission through EAS. Your app goes live \u2014 without Xcode or Android Studio."
+    }
   },
   "features": {
-    "title1": "Everything you need",
-    "title2": "to ship.",
+    "label": "Features",
+    "headline": "Built for builders, powered by AI",
+    "subheadline": "Everything you need to go from idea to App Store",
     "items": {
       "multiScreen": {
         "title": "Multi-Screen Generation",
-        "desc": "Describe an entire app. Get a complete project with navigation, state management, and data flow — not just a single screen."
+        "desc": "Describe an entire app. Get a complete project with navigation, state management, and data flow \u2014 not just a single screen."
       },
       "livePreview": {
         "title": "Live Device Preview",
@@ -35,11 +50,19 @@
       },
       "chatDriven": {
         "title": "Chat-Driven Iteration",
-        "desc": "Refine any screen conversationally. Change layouts, colors, logic — like pair-programming with a senior engineer."
+        "desc": "Refine any screen conversationally. Change layouts, colors, logic \u2014 like pair-programming with a senior engineer."
       },
       "publish": {
         "title": "One-Click Publish",
         "desc": "Deploy to the web instantly. Export to GitHub. Build with EAS. Ship to the App Store and Google Play."
+      },
+      "realCode": {
+        "title": "Real Code You Own",
+        "desc": "Every project is a real Expo/React Native codebase. Export to GitHub, hand off to a dev team. No lock-in. Ever."
+      },
+      "gemini": {
+        "title": "Powered by Gemini 2.5 Pro",
+        "desc": "AppX uses Google's most capable coding model to plan, write, and validate your app's code \u2014 so what you get actually works."
       }
     }
   },
@@ -47,26 +70,67 @@
     "label": "How it works",
     "describe": {
       "word": "Describe",
-      "desc": "Tell us what you want to build. In plain English. That's it."
+      "desc": "Write your idea in plain English. As much or as little detail as you want."
     },
     "generate": {
       "word": "Generate",
-      "desc": "AI writes production React Native code. Watch it happen in real time."
+      "desc": "AI plans your screens, writes navigation logic, and generates real React Native code \u2014 live."
+    },
+    "preview": {
+      "word": "Preview",
+      "desc": "Scan a QR code with Expo Go. Your app is on your phone in under 30 seconds."
+    },
+    "refine": {
+      "word": "Refine",
+      "desc": "\"Change the color to navy.\" Every change is applied instantly and pushed to your phone."
     },
     "ship": {
       "word": "Ship",
-      "desc": "Test on your phone. Push to GitHub. Publish to app stores."
+      "desc": "One click to deploy. One build to submit to App Store and Google Play. You're live."
     }
   },
-  "statement": {
-    "pre": "From idea to",
-    "highlight": "App Store",
-    "mid": "in hours,",
-    "end": "not months."
+  "useCases": {
+    "label": "Who it's for",
+    "headline": "Built for anyone with an app idea",
+    "founders": {
+      "title": "Entrepreneurs & Founders",
+      "desc": "Validate your idea before spending $50K on a dev team. Build an MVP, test with real users, raise funding with a working product."
+    },
+    "designers": {
+      "title": "Designers",
+      "desc": "Your Figma mockups deserve to be real apps. Turn designs into interactive, shippable products without writing code."
+    },
+    "developers": {
+      "title": "Developers",
+      "desc": "Skip the boilerplate. Scaffold a full multi-screen app in 2 minutes, then customize the real React Native code."
+    },
+    "startups": {
+      "title": "Startups & Agencies",
+      "desc": "Ship MVPs in days. Prototype for clients in hours. Multiply your output without multiplying headcount."
+    },
+    "students": {
+      "title": "Students & Side Projects",
+      "desc": "That app idea you've had for two years? Build it this weekend. For free."
+    }
+  },
+  "showcase": {
+    "label": "Showcase",
+    "headline": "See what people are building"
+  },
+  "comparison": {
+    "title": "Why AppX?",
+    "headers": ["", "AppX Pro", "Freelance Dev", "No-Code Tool"],
+    "rows": {
+      "cost": ["Cost", "$20/mo", "$5,000\u2013$50,000", "$30\u2013$300/mo"],
+      "time": ["Time to App Store", "Hours", "Months", "Never (web only)"],
+      "native": ["Real native code", "\u2713", "\u2713", "\u2717"],
+      "ownCode": ["You own the code", "\u2713", "\u2713", "\u2717"],
+      "appStore": ["App Store publishing", "\u2713", "\u2713", "\u2717"]
+    }
   },
   "pricing": {
-    "title": "Simple pricing",
-    "subtitle": "Start free. Upgrade when you're ready.",
+    "title": "Simple plans for serious work",
+    "subtitle": "Start free. Build your first app today. Upgrade when you're ready to ship.",
     "mostPopular": "Most Popular",
     "creditsPerMonth": "credits / month",
     "free": {
@@ -98,10 +162,45 @@
       "dedicatedSupport": "Dedicated support"
     }
   },
+  "faq": {
+    "headline": "Frequently asked questions",
+    "items": [
+      {
+        "q": "Do I need coding experience?",
+        "a": "No. But if you can code, you'll love the real code output. Every project is a standard Expo/React Native codebase you can open in any IDE."
+      },
+      {
+        "q": "Is it really production-quality code?",
+        "a": "Yes. Expo + React Native \u2014 the same stack used by companies like Shopify, Discord, and thousands of startups. StyleSheet.create, proper navigation, real state management."
+      },
+      {
+        "q": "Can I edit the code myself?",
+        "a": "Absolutely. Export to GitHub, open in VS Code or any IDE. It's your code \u2014 no lock-in, no proprietary format."
+      },
+      {
+        "q": "What if the AI gets it wrong?",
+        "a": "Just tell it. Every change is conversational. Say \"make the button bigger\" or \"add a settings screen\" and it updates instantly. You can also edit the code directly."
+      },
+      {
+        "q": "How does App Store publishing work?",
+        "a": "AppX uses EAS Build from Expo. Connect your Apple Developer account, and we handle the build, signing, and submission process."
+      },
+      {
+        "q": "Will my app work on Android too?",
+        "a": "Yes. React Native runs on both iOS and Android from the same codebase. Build once, ship everywhere."
+      },
+      {
+        "q": "What can I build with this?",
+        "a": "Anything from a simple habit tracker to a multi-screen marketplace with user auth, data storage, and real-time features. If React Native can do it, AppX can build it."
+      }
+    ]
+  },
   "cta": {
-    "title1": "Your next app starts",
-    "title2": "with one message.",
-    "button": "Start Building Free"
+    "headline": "Your idea deserves to be in the App Store.",
+    "sub": "Not stuck in a doc somewhere.",
+    "desc": "Join thousands of founders, designers, and builders who shipped their apps with AppX. Start free \u2014 no credit card, no code, no waiting.",
+    "button": "Start Building Free",
+    "secondary": "See what people are building"
   },
   "footer": {
     "tagline": "The AI platform for shipping mobile apps.",
@@ -214,7 +313,7 @@
   },
   "language": {
     "en": "English",
-    "ru": "Русский",
-    "uz": "O'zbek"
+    "ru": "\u0420\u0443\u0441\u0441\u043a\u0438\u0439",
+    "uz": "O\u2018zbek"
   }
 }

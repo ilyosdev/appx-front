@@ -30,9 +30,11 @@ const MIN_DESCRIPTION_LENGTH = 50;
 interface AppComposerProps {
   showExamples?: boolean;
   className?: string;
+  variant?: 'dark' | 'light';
 }
 
-export function AppComposer({ showExamples = true, className }: AppComposerProps) {
+export function AppComposer({ showExamples = true, className, variant = 'dark' }: AppComposerProps) {
+  const isLight = variant === 'light';
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
   const { openUpgradeModal, openCreditModal } = useBillingStore();
@@ -212,10 +214,13 @@ export function AppComposer({ showExamples = true, className }: AppComposerProps
     <div className={className}>
       <div className="max-w-2xl mx-auto">
         <div className={cn(
-          'rounded-2xl border bg-[#222225] transition-all duration-200',
+          'rounded-2xl border transition-all duration-200',
+          isLight ? 'bg-white' : 'bg-[#222225]',
           isSubmitting
             ? 'border-primary-500/40 shadow-lg shadow-primary-500/10'
-            : 'border-surface-700/60 hover:border-surface-600/80 focus-within:border-surface-500/60 focus-within:shadow-lg focus-within:shadow-black/20'
+            : isLight
+              ? 'border-gray-200 shadow-[0_2px_20px_rgba(0,0,0,0.06)] hover:border-gray-300 focus-within:border-gray-300 focus-within:shadow-lg focus-within:shadow-black/[0.06]'
+              : 'border-surface-700/60 hover:border-surface-600/80 focus-within:border-surface-500/60 focus-within:shadow-lg focus-within:shadow-black/20'
         )}>
           {/* Attached image with inspire/clone toggle */}
           <AnimatePresence>
@@ -227,24 +232,24 @@ export function AppComposer({ showExamples = true, className }: AppComposerProps
                 className="overflow-hidden"
               >
                 <div className="px-4 pt-3">
-                  <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-surface-800 border border-surface-700">
+                  <div className={cn("flex items-center gap-2.5 px-3 py-2 rounded-lg", isLight ? 'bg-gray-50 border border-gray-200' : 'bg-surface-800 border border-surface-700')}>
                     {previewUrl && <img src={previewUrl} alt="" className="w-8 h-8 rounded object-cover" />}
                     {isUploading ? (
                       <>
                         <Loader2 className="w-3.5 h-3.5 text-primary-400 animate-spin" />
-                        <span className="text-xs text-surface-400">Uploading...</span>
+                        <span className={cn("text-xs", isLight ? 'text-gray-500' : 'text-surface-400')}>Uploading...</span>
                       </>
                     ) : (
                       <div className="flex items-center gap-1.5 flex-1">
                         {/* Inspire / Clone pill toggle */}
-                        <div className="flex items-center rounded-md bg-surface-900 p-0.5">
+                        <div className={cn("flex items-center rounded-md p-0.5", isLight ? 'bg-gray-100' : 'bg-surface-900')}>
                           <button
                             onClick={() => setImageMode('inspire')}
                             className={cn(
                               'flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-all',
                               imageMode === 'inspire'
-                                ? 'bg-primary-500/20 text-primary-300'
-                                : 'text-surface-500 hover:text-surface-300'
+                                ? isLight ? 'bg-primary-500/15 text-primary-600' : 'bg-primary-500/20 text-primary-300'
+                                : isLight ? 'text-gray-400 hover:text-gray-600' : 'text-surface-500 hover:text-surface-300'
                             )}
                           >
                             <Wand2 className="w-3 h-3" />
@@ -255,8 +260,8 @@ export function AppComposer({ showExamples = true, className }: AppComposerProps
                             className={cn(
                               'flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-all',
                               imageMode === 'clone'
-                                ? 'bg-cyan-500/20 text-cyan-300'
-                                : 'text-surface-500 hover:text-surface-300'
+                                ? isLight ? 'bg-cyan-500/15 text-cyan-600' : 'bg-cyan-500/20 text-cyan-300'
+                                : isLight ? 'text-gray-400 hover:text-gray-600' : 'text-surface-500 hover:text-surface-300'
                             )}
                           >
                             <Copy className="w-3 h-3" />
@@ -265,7 +270,7 @@ export function AppComposer({ showExamples = true, className }: AppComposerProps
                         </div>
                       </div>
                     )}
-                    <button onClick={clearImage} className="p-0.5 text-surface-500 hover:text-surface-300 transition-colors">
+                    <button onClick={clearImage} className={cn("p-0.5 transition-colors", isLight ? 'text-gray-400 hover:text-gray-600' : 'text-surface-500 hover:text-surface-300')}>
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -286,7 +291,8 @@ export function AppComposer({ showExamples = true, className }: AppComposerProps
               rows={1}
               disabled={isSubmitting}
               className={cn(
-                'w-full bg-transparent text-[15px] text-white placeholder:text-surface-500 resize-none outline-none leading-relaxed',
+                'w-full bg-transparent text-[15px] resize-none outline-none leading-relaxed',
+                isLight ? 'text-[#1a1615] placeholder:text-gray-400' : 'text-white placeholder:text-surface-500',
                 isSubmitting && 'opacity-50'
               )}
               style={{ minHeight: '28px', maxHeight: '200px' }}
@@ -299,7 +305,7 @@ export function AppComposer({ showExamples = true, className }: AppComposerProps
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isSubmitting}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-surface-500 hover:text-surface-300 hover:bg-surface-800 transition-all"
+              className={cn("w-8 h-8 flex items-center justify-center rounded-lg transition-all", isLight ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100' : 'text-surface-500 hover:text-surface-300 hover:bg-surface-800')}
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -310,10 +316,12 @@ export function AppComposer({ showExamples = true, className }: AppComposerProps
                   onClick={() => setShowModelMenu(!showModelMenu)}
                   className={cn(
                     'flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium transition-all',
-                    showModelMenu ? 'bg-surface-700 text-white' : 'text-surface-400 hover:text-surface-200 hover:bg-surface-800'
+                    showModelMenu
+                      ? isLight ? 'bg-gray-100 text-[#1a1615]' : 'bg-surface-700 text-white'
+                      : isLight ? 'text-gray-500 hover:text-gray-700 hover:bg-gray-100' : 'text-surface-400 hover:text-surface-200 hover:bg-surface-800'
                   )}
                 >
-                  <Sparkles className="w-3 h-3 text-primary-400" />
+                  <Sparkles className={cn("w-3 h-3", isLight ? 'text-[#3b82f6]' : 'text-primary-400')} />
                   <span>Auto</span>
                 </button>
                 <AnimatePresence>
@@ -322,19 +330,19 @@ export function AppComposer({ showExamples = true, className }: AppComposerProps
                       initial={{ opacity: 0, y: 4 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 4 }}
-                      className="absolute bottom-full left-0 mb-2 w-64 bg-surface-900 border border-surface-700 rounded-xl shadow-xl overflow-hidden z-50"
+                      className={cn("absolute bottom-full left-0 mb-2 w-64 rounded-xl shadow-xl overflow-hidden z-50", isLight ? 'bg-white border border-gray-200 shadow-lg' : 'bg-surface-900 border border-surface-700')}
                     >
-                      <div className="p-2 border-b border-surface-800">
-                        <p className="text-[11px] text-primary-400 font-medium text-center">Sign in to select a model</p>
+                      <div className={cn("p-2 border-b", isLight ? 'border-gray-100' : 'border-surface-800')}>
+                        <p className={cn("text-[11px] font-medium text-center", isLight ? 'text-[#3b82f6]' : 'text-primary-400')}>Sign in to select a model</p>
                       </div>
                       <div className="p-1.5 opacity-50 pointer-events-none">
                         {availableModels.length > 0 ? availableModels.map((m) => (
                           <div key={m.id} className="flex items-center justify-between px-3 py-2 rounded-lg">
-                            <span className="text-sm text-surface-300">{m.displayName}</span>
-                            <span className="text-xs text-surface-500">{m.isFree ? 'Free' : `${m.creditCost || 1}cr`}</span>
+                            <span className={cn("text-sm", isLight ? 'text-gray-700' : 'text-surface-300')}>{m.displayName}</span>
+                            <span className={cn("text-xs", isLight ? 'text-gray-500' : 'text-surface-500')}>{m.isFree ? 'Free' : `${m.creditCost || 1}cr`}</span>
                           </div>
                         )) : (
-                          <div className="px-3 py-2 text-xs text-surface-500 text-center">Loading models...</div>
+                          <div className={cn("px-3 py-2 text-xs text-center", isLight ? 'text-gray-500' : 'text-surface-500')}>Loading models...</div>
                         )}
                       </div>
                     </motion.div>
@@ -349,13 +357,13 @@ export function AppComposer({ showExamples = true, className }: AppComposerProps
                   className={cn(
                     'flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium transition-all',
                     showModelMenu
-                      ? 'bg-surface-700 text-white'
-                      : 'text-surface-400 hover:text-surface-200 hover:bg-surface-800'
+                      ? isLight ? 'bg-gray-100 text-[#1a1615]' : 'bg-surface-700 text-white'
+                      : isLight ? 'text-gray-500 hover:text-gray-700 hover:bg-gray-100' : 'text-surface-400 hover:text-surface-200 hover:bg-surface-800'
                   )}
                 >
-                  <Sparkles className="w-3 h-3 text-primary-400" />
+                  <Sparkles className={cn("w-3 h-3", isLight ? 'text-[#3b82f6]' : 'text-primary-400')} />
                   <span>{effectiveModel.displayName}</span>
-                  <span className="text-surface-600">{effectiveModel.creditCost}cr</span>
+                  <span className={isLight ? 'text-gray-400' : 'text-surface-600'}>{effectiveModel.creditCost}cr</span>
                 </button>
 
                 <AnimatePresence>
@@ -365,7 +373,7 @@ export function AppComposer({ showExamples = true, className }: AppComposerProps
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 4, scale: 0.95 }}
                       transition={{ duration: 0.12 }}
-                      className="absolute bottom-full left-0 mb-2 w-56 bg-surface-800 border border-surface-700 rounded-xl shadow-2xl shadow-black/30 py-1 z-50"
+                      className={cn("absolute bottom-full left-0 mb-2 w-56 rounded-xl py-1 z-50", isLight ? 'bg-white border border-gray-200 shadow-lg' : 'bg-surface-800 border border-surface-700 shadow-2xl shadow-black/30')}
                     >
                       {availableModels.map((model) => (
                         <button
@@ -374,16 +382,16 @@ export function AppComposer({ showExamples = true, className }: AppComposerProps
                           className={cn(
                             'w-full text-left px-3 py-2.5 transition-colors',
                             model.id === effectiveModel.id
-                              ? 'bg-primary-500/10 text-white'
-                              : 'text-surface-300 hover:bg-surface-700/70'
+                              ? isLight ? 'bg-blue-50 text-[#1a1615]' : 'bg-primary-500/10 text-white'
+                              : isLight ? 'text-gray-600 hover:bg-gray-50' : 'text-surface-300 hover:bg-surface-700/70'
                           )}
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium">{model.displayName}</span>
-                            <span className="text-xs text-surface-500">{model.creditCost}cr</span>
+                            <span className={cn("text-xs", isLight ? 'text-gray-500' : 'text-surface-500')}>{model.creditCost}cr</span>
                           </div>
                           {model.description && (
-                            <p className="text-[11px] text-surface-500 mt-0.5">{model.description}</p>
+                            <p className={cn("text-[11px] mt-0.5", isLight ? 'text-gray-500' : 'text-surface-500')}>{model.description}</p>
                           )}
                         </button>
                       ))}
@@ -395,7 +403,7 @@ export function AppComposer({ showExamples = true, className }: AppComposerProps
 
             <div className="flex-1 flex justify-end items-center pr-1">
               {appDescription.length > 0 && !isValid && (
-                <span className="text-[11px] text-surface-600 tabular-nums">
+                <span className={cn("text-[11px] tabular-nums", isLight ? 'text-gray-400' : 'text-surface-600')}>
                   {MIN_DESCRIPTION_LENGTH - appDescription.length} more chars
                 </span>
               )}
@@ -409,8 +417,8 @@ export function AppComposer({ showExamples = true, className }: AppComposerProps
               className={cn(
                 'w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-200',
                 canSubmit
-                  ? 'bg-white text-surface-900 shadow-md shadow-white/10 hover:shadow-white/20'
-                  : 'bg-surface-800 text-surface-600 cursor-not-allowed'
+                  ? isLight ? 'bg-[#1a1615] text-white shadow-md shadow-black/10 hover:shadow-black/20' : 'bg-white text-surface-900 shadow-md shadow-white/10 hover:shadow-white/20'
+                  : isLight ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-surface-800 text-surface-600 cursor-not-allowed'
               )}
             >
               {isSubmitting ? (
@@ -431,8 +439,8 @@ export function AppComposer({ showExamples = true, className }: AppComposerProps
               exit={{ opacity: 0 }}
               className="flex items-center justify-center gap-2 mt-3"
             >
-              <Loader2 className="w-3.5 h-3.5 text-primary-400 animate-spin" />
-              <span className="text-sm text-surface-400">{submitStage}</span>
+              <Loader2 className={cn("w-3.5 h-3.5 animate-spin", isLight ? 'text-[#3b82f6]' : 'text-primary-400')} />
+              <span className={cn("text-sm", isLight ? 'text-gray-500' : 'text-surface-400')}>{submitStage}</span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -457,7 +465,7 @@ export function AppComposer({ showExamples = true, className }: AppComposerProps
             <span className="text-sm text-amber-400 flex-1">No credits remaining</span>
             <button
               onClick={() => canPurchaseCredits ? openCreditModal() : openUpgradeModal()}
-              className="text-xs font-medium text-primary-400 hover:text-primary-300 transition-colors"
+              className={cn("text-xs font-medium transition-colors", isLight ? 'text-[#3b82f6] hover:text-blue-700' : 'text-primary-400 hover:text-primary-300')}
             >
               {canPurchaseCredits ? 'Buy credits' : 'Upgrade plan'}
             </button>
@@ -473,7 +481,12 @@ export function AppComposer({ showExamples = true, className }: AppComposerProps
               key={i}
               onClick={() => { setAppDescription(prompt); setTimeout(adjustTextarea, 0); }}
               disabled={isSubmitting}
-              className="px-3 py-1.5 text-xs rounded-full bg-surface-800/40 border border-surface-700/40 text-surface-500 hover:text-surface-300 hover:bg-surface-800/70 hover:border-surface-600/60 transition-all disabled:opacity-40"
+              className={cn(
+                "px-3 py-1.5 text-xs rounded-full transition-all disabled:opacity-40",
+                isLight
+                  ? 'bg-white border border-gray-200 text-[#555] hover:text-[#1a1615] hover:bg-gray-50 hover:border-gray-300 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'
+                  : 'bg-surface-800/40 border border-surface-700/40 text-surface-500 hover:text-surface-300 hover:bg-surface-800/70 hover:border-surface-600/60'
+              )}
             >
               {prompt}
             </button>
