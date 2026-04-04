@@ -3,13 +3,13 @@ import { Link } from 'react-router-dom';
 import { motion, useInView, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../stores/authStore';
 import { AppComposer } from '../components/composer/AppComposer';
-import { ArrowRight, Check, Menu, X, Github, Code2, Smartphone, Rocket, ChevronDown, MessageSquare, Upload, FileCode, Brain, Briefcase, Palette, Terminal, GraduationCap, Building2 } from 'lucide-react';
+import { ArrowRight, Check, Menu, X, Github, Code2, Smartphone, Rocket, ChevronDown, MessageSquare, Upload, FileCode, Brain } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from '../components/ui/LanguageSwitcher';
 import { cn } from '../lib/utils';
 
 // ─── FONT ──────────────────────────────────────────────
-const FONT_LINK = 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap';
+const FONT_LINK = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap';
 
 // ─── REVEAL (scroll animation wrapper) ─────────────────
 function Reveal({ children, className, id, delay = 0 }: { children: React.ReactNode; className?: string; id?: string; delay?: number }) {
@@ -38,14 +38,14 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function FooterCol({ title, items }: { title: string; items: { label: string; to?: string; href?: string }[] }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#999] mb-4">{title}</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-gray-400 mb-4">{title}</p>
       <ul className="space-y-2.5">
         {items.map((item) => (
           <li key={item.label}>
             {item.href ? (
-              <a href={item.href} className="text-sm text-[#555] hover:text-[#1a1615] transition-colors">{item.label}</a>
+              <a href={item.href} className="text-sm text-gray-600 hover:text-gray-900 transition-colors">{item.label}</a>
             ) : (
-              <Link to={item.to!} className="text-sm text-[#555] hover:text-[#1a1615] transition-colors">{item.label}</Link>
+              <Link to={item.to!} className="text-sm text-gray-600 hover:text-gray-900 transition-colors">{item.label}</Link>
             )}
           </li>
         ))}
@@ -78,7 +78,7 @@ function Nav({ ctaPath, isAuthenticated }: { ctaPath: string; isAuthenticated: b
     <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full px-4">
       <div
         className={cn(
-          'max-w-[900px] w-full mx-auto px-6 h-14 flex items-center justify-between bg-white/80 backdrop-blur-xl rounded-full transition-shadow duration-300',
+          'max-w-[900px] w-full mx-auto px-6 h-14 flex items-center justify-between bg-white/90 backdrop-blur-xl rounded-full transition-shadow duration-300',
           scrolled && 'shadow-[0_2px_20px_rgba(0,0,0,0.08)]'
         )}
       >
@@ -87,7 +87,7 @@ function Nav({ ctaPath, isAuthenticated }: { ctaPath: string; isAuthenticated: b
           <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center p-1.5">
             <img src="/logo.png" alt="AppX" className="w-full h-full" />
           </div>
-          <span className="font-semibold text-[15px] text-[#1a1615] tracking-tight">AppX</span>
+          <span className="font-semibold text-[15px] text-gray-900 tracking-tight">AppX</span>
         </Link>
 
         {/* Center links */}
@@ -97,7 +97,7 @@ function Nav({ ctaPath, isAuthenticated }: { ctaPath: string; isAuthenticated: b
               key={l.href}
               href={l.href}
               {...(l.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-              className="text-sm text-[#555] hover:text-[#1a1615] transition-colors"
+              className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
             >
               {l.label}
             </a>
@@ -108,17 +108,17 @@ function Nav({ ctaPath, isAuthenticated }: { ctaPath: string; isAuthenticated: b
         <div className="hidden md:flex items-center gap-3">
           <LanguageSwitcher variant="light" />
           {isAuthenticated ? (
-            <Link to="/dashboard" className="text-sm font-medium text-[#555] hover:text-[#1a1615] transition-colors">
+            <Link to="/dashboard" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
               {t('nav.dashboard')} →
             </Link>
           ) : (
             <>
-              <Link to="/login" className="text-sm text-[#555] hover:text-[#1a1615] transition-colors">
+              <Link to="/login" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
                 {t('nav.signIn')}
               </Link>
               <Link
                 to={ctaPath}
-                className="bg-[#1a1615] text-white rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#2a2625] transition-colors"
+                className="bg-gray-900 text-white rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-gray-800 transition-colors"
               >
                 {t('nav.startBuilding')}
               </Link>
@@ -127,7 +127,7 @@ function Nav({ ctaPath, isAuthenticated }: { ctaPath: string; isAuthenticated: b
         </div>
 
         {/* Mobile hamburger */}
-        <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden p-2 text-[#555]">
+        <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden p-2 text-gray-600">
           {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
       </div>
@@ -145,7 +145,7 @@ function Nav({ ctaPath, isAuthenticated }: { ctaPath: string; isAuthenticated: b
               href={l.href}
               {...(l.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
               onClick={() => setMobileOpen(false)}
-              className="block text-sm text-[#555] hover:text-[#1a1615] py-2.5"
+              className="block text-sm text-gray-600 hover:text-gray-900 py-2.5"
             >
               {l.label}
             </a>
@@ -153,15 +153,15 @@ function Nav({ ctaPath, isAuthenticated }: { ctaPath: string; isAuthenticated: b
           <div className="border-t border-gray-100 pt-4 mt-3 space-y-3">
             <LanguageSwitcher variant="light" />
             {isAuthenticated ? (
-              <Link to="/dashboard" className="block text-sm font-semibold text-center bg-[#1a1615] text-white rounded-full py-2.5">
+              <Link to="/dashboard" className="block text-sm font-semibold text-center bg-gray-900 text-white rounded-full py-2.5">
                 {t('nav.dashboard')}
               </Link>
             ) : (
               <>
-                <Link to="/login" className="block text-sm text-[#555] hover:text-[#1a1615] py-1">
+                <Link to="/login" className="block text-sm text-gray-600 hover:text-gray-900 py-1">
                   {t('nav.signIn')}
                 </Link>
-                <Link to="/register" className="block text-sm font-semibold text-center bg-[#1a1615] text-white rounded-full py-2.5">
+                <Link to="/register" className="block text-sm font-semibold text-center bg-gray-900 text-white rounded-full py-2.5">
                   {t('nav.startBuilding')}
                 </Link>
               </>
@@ -175,12 +175,12 @@ function Nav({ ctaPath, isAuthenticated }: { ctaPath: string; isAuthenticated: b
 
 // ─── SHOWCASE DATA ─────────────────────────────────────
 const SHOWCASE_APPS = [
-  { name: 'FitTrack Pro', category: 'Fitness', time: '12 min', gradient: 'from-emerald-400 to-teal-500' },
-  { name: 'FoodDash', category: 'Delivery', time: '18 min', gradient: 'from-orange-400 to-red-500' },
-  { name: 'MindfulMe', category: 'Wellness', time: '8 min', gradient: 'from-purple-400 to-indigo-500' },
-  { name: 'ShopLocal', category: 'E-commerce', time: '22 min', gradient: 'from-blue-400 to-cyan-500' },
-  { name: 'StudyBuddy', category: 'Education', time: '15 min', gradient: 'from-amber-400 to-yellow-500' },
-  { name: 'PetCare', category: 'Lifestyle', time: '10 min', gradient: 'from-pink-400 to-rose-500' },
+  { name: 'FitTrack Pro', category: 'Fitness', time: '12 min', gradient: 'from-emerald-500 to-teal-600' },
+  { name: 'FoodDash', category: 'Delivery', time: '18 min', gradient: 'from-orange-500 to-red-600' },
+  { name: 'MindfulMe', category: 'Wellness', time: '8 min', gradient: 'from-purple-500 to-indigo-600' },
+  { name: 'ShopLocal', category: 'E-commerce', time: '22 min', gradient: 'from-blue-500 to-cyan-600' },
+  { name: 'StudyBuddy', category: 'Education', time: '15 min', gradient: 'from-amber-500 to-yellow-600' },
+  { name: 'PetCare', category: 'Lifestyle', time: '10 min', gradient: 'from-pink-500 to-rose-600' },
 ];
 
 // ─── FAQ DATA ──────────────────────────────────────────
@@ -257,14 +257,6 @@ export default function Landing() {
     },
   ];
 
-  const USE_CASES = [
-    { icon: Briefcase, title: t('useCases.founders.title'), desc: t('useCases.founders.desc') },
-    { icon: Palette, title: t('useCases.designers.title'), desc: t('useCases.designers.desc') },
-    { icon: Terminal, title: t('useCases.developers.title'), desc: t('useCases.developers.desc') },
-    { icon: Building2, title: t('useCases.startups.title'), desc: t('useCases.startups.desc') },
-    { icon: GraduationCap, title: t('useCases.students.title'), desc: t('useCases.students.desc') },
-  ];
-
   const FEATURES = [
     { icon: FileCode, title: t('features.items.multiScreen.title'), desc: t('features.items.multiScreen.desc'), wide: true },
     { icon: Smartphone, title: t('features.items.livePreview.title'), desc: t('features.items.livePreview.desc'), wide: false },
@@ -283,21 +275,21 @@ export default function Landing() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#faf8f6] text-[#1a1615] antialiased overflow-x-hidden font-sans">
+    <div className="min-h-screen bg-white text-gray-900 antialiased overflow-x-hidden font-sans">
       <style>{`
         @import url('${FONT_LINK}');
-        .font-sans { font-family: 'Nunito', system-ui, sans-serif; }
-        body { font-family: 'Nunito', system-ui, sans-serif; }
+        .font-sans { font-family: 'Inter', system-ui, sans-serif; }
+        body { font-family: 'Inter', system-ui, sans-serif; }
         @keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
       `}</style>
 
       <Nav ctaPath={ctaPath} isAuthenticated={isAuthenticated} />
 
       {/* ═══════════════════════════════════════════════════
-          SECTION 1: HERO
+          SECTION 1: HERO — Input is the star
           ═══════════════════════════════════════════════════ */}
-      <section className="relative pt-32 sm:pt-40 pb-20 sm:pb-28 px-6 bg-gradient-to-b from-[#d4e4f7] via-[#f0ece7] to-[#faf8f6]">
-        <div className="max-w-3xl mx-auto text-center">
+      <section className="relative pt-32 sm:pt-40 pb-20 sm:pb-28 px-6 bg-gradient-to-b from-[#f0f5ff] via-white to-white">
+        <div className="max-w-4xl mx-auto text-center">
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -313,16 +305,16 @@ export default function Landing() {
             transition={{ duration: 0.9, delay: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
             className="text-[clamp(2.5rem,7vw,5.5rem)] font-extrabold tracking-tight leading-[1.05]"
           >
-            <span className="text-[#1a1615]">{t('hero.headline1')}</span>
+            <span className="text-gray-900">{t('hero.headline1')}</span>
             <br />
-            <span className="text-[#999]">{t('hero.headline2')}</span>
+            <span className="text-gray-400">{t('hero.headline2')}</span>
           </motion.h1>
 
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.7 }}
-            className="text-lg sm:text-xl text-[#555] mt-6 mb-10 max-w-2xl mx-auto leading-relaxed"
+            className="text-lg sm:text-xl text-gray-600 mt-6 mb-10 max-w-2xl mx-auto leading-relaxed"
           >
             {t('hero.subheadline')}
           </motion.p>
@@ -331,16 +323,28 @@ export default function Landing() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 1.0 }}
-            className="max-w-2xl mx-auto"
+            className="max-w-3xl mx-auto"
           >
             <AppComposer variant="light" />
+          </motion.div>
+
+          {/* Trust strip — replaces "What You Get" section */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.8, delay: 1.3 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-8 mt-8 text-sm text-gray-400"
+          >
+            <span className="flex items-center gap-2"><Code2 className="w-4 h-4" /> Real React Native code</span>
+            <span className="flex items-center gap-2"><Smartphone className="w-4 h-4" /> Test on your phone</span>
+            <span className="flex items-center gap-2"><Rocket className="w-4 h-4" /> Ship to App Store</span>
           </motion.div>
 
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 1.3 }}
-            className="text-sm text-[#999] mt-6 text-center"
+            transition={{ duration: 0.8, delay: 1.5 }}
+            className="text-sm text-gray-400 mt-4 text-center"
           >
             {t('hero.trustLine')}
           </motion.p>
@@ -351,13 +355,13 @@ export default function Landing() {
           SECTION 2: SOCIAL PROOF BAR
           ═══════════════════════════════════════════════════ */}
       <section className="py-12 overflow-hidden">
-        <p className="text-sm text-[#999] text-center mb-8">{t('socialProof.title')}</p>
+        <p className="text-sm text-gray-400 text-center mb-8">{t('socialProof.title')}</p>
         <div className="overflow-hidden">
           <div className="flex" style={{ animation: 'scroll 30s linear infinite', width: 'max-content' }}>
             {[...BRAND_NAMES, ...BRAND_NAMES].map((name, i) => (
               <div
                 key={`${name}-${i}`}
-                className="flex-shrink-0 px-8 py-3 mx-3 rounded-full bg-gray-100 text-sm font-medium text-[#999]"
+                className="flex-shrink-0 px-8 py-3 mx-3 rounded-full bg-gray-100 text-sm font-medium text-gray-400"
               >
                 {name}
               </div>
@@ -367,140 +371,7 @@ export default function Landing() {
       </section>
 
       {/* ═══════════════════════════════════════════════════
-          SECTION 3: WHAT YOU GET
-          ═══════════════════════════════════════════════════ */}
-      <section className="py-20 sm:py-28 px-6">
-        <div className="max-w-[1000px] mx-auto text-center">
-          <Reveal>
-            <SectionLabel>{t('whatYouGet.label')}</SectionLabel>
-          </Reveal>
-          <Reveal delay={0.05}>
-            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-12">{t('whatYouGet.headline')}</h2>
-          </Reveal>
-
-          <Reveal delay={0.1}>
-            <div className="bg-white rounded-[32px] shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-8 sm:p-12">
-              <div className="grid md:grid-cols-3 gap-10">
-                <div className="text-center">
-                  <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-5">
-                    <Code2 className="w-6 h-6 text-[#3b82f6]" />
-                  </div>
-                  <h3 className="text-lg font-bold mb-2">{t('whatYouGet.realCode.title')}</h3>
-                  <p className="text-[15px] text-[#555] leading-relaxed">{t('whatYouGet.realCode.desc')}</p>
-                </div>
-                <div className="text-center">
-                  <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-5">
-                    <Smartphone className="w-6 h-6 text-[#3b82f6]" />
-                  </div>
-                  <h3 className="text-lg font-bold mb-2">{t('whatYouGet.phoneTest.title')}</h3>
-                  <p className="text-[15px] text-[#555] leading-relaxed">{t('whatYouGet.phoneTest.desc')}</p>
-                </div>
-                <div className="text-center">
-                  <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-5">
-                    <Rocket className="w-6 h-6 text-[#3b82f6]" />
-                  </div>
-                  <h3 className="text-lg font-bold mb-2">{t('whatYouGet.appStore.title')}</h3>
-                  <p className="text-[15px] text-[#555] leading-relaxed">{t('whatYouGet.appStore.desc')}</p>
-                </div>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════════════
-          SECTION 4: HOW IT WORKS
-          ═══════════════════════════════════════════════════ */}
-      <section id="how-it-works" className="py-20 sm:py-28 px-6">
-        <div className="max-w-[1000px] mx-auto text-center">
-          <Reveal>
-            <SectionLabel>{t('howItWorks.label')}</SectionLabel>
-          </Reveal>
-
-          <Reveal delay={0.1}>
-            <div className="bg-white rounded-[32px] shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-8 sm:p-12">
-              <div className="flex flex-wrap justify-center gap-6 sm:gap-4">
-                {HOW_IT_WORKS_STEPS.map((step, i) => (
-                  <Reveal key={step.num} delay={i * 0.08}>
-                    <div className="flex flex-col items-center text-center w-[140px] sm:w-[160px]">
-                      <div className="w-12 h-12 rounded-full border-2 border-gray-200 flex items-center justify-center mb-4">
-                        <span className="text-sm font-bold text-[#999]">{step.num}</span>
-                      </div>
-                      <h3 className="text-xl font-bold mb-1">{step.word}</h3>
-                      <p className="text-[13px] text-[#555] leading-relaxed">{step.desc}</p>
-                    </div>
-                  </Reveal>
-                ))}
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════════════
-          SECTION 5: USE CASES
-          ═══════════════════════════════════════════════════ */}
-      <section className="py-20 sm:py-28 px-6">
-        <div className="max-w-[1200px] mx-auto text-center">
-          <Reveal>
-            <SectionLabel>{t('useCases.label')}</SectionLabel>
-          </Reveal>
-          <Reveal delay={0.05}>
-            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-12">{t('useCases.headline')}</h2>
-          </Reveal>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {USE_CASES.map((uc, i) => (
-              <Reveal key={uc.title} delay={i * 0.08}>
-                <div className={cn(
-                  'bg-white rounded-[24px] shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-7 h-full hover:shadow-[0_4px_30px_rgba(0,0,0,0.08)] transition-shadow text-left',
-                  i === 4 && 'sm:col-span-2 lg:col-span-1 lg:mx-auto lg:max-w-[380px]'
-                )}>
-                  <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center mb-4">
-                    <uc.icon className="w-5 h-5 text-[#3b82f6]" />
-                  </div>
-                  <h3 className="text-lg font-bold mb-2">{uc.title}</h3>
-                  <p className="text-[15px] text-[#555] leading-relaxed">{uc.desc}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════════════
-          SECTION 6: FEATURES BENTO GRID
-          ═══════════════════════════════════════════════════ */}
-      <section id="features" className="py-20 sm:py-28 px-6">
-        <div className="max-w-[1200px] mx-auto text-center">
-          <Reveal>
-            <SectionLabel>{t('features.label')}</SectionLabel>
-          </Reveal>
-          <Reveal delay={0.05}>
-            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-3">{t('features.headline')}</h2>
-          </Reveal>
-          <Reveal delay={0.08}>
-            <p className="text-[#555] text-lg mb-12 max-w-xl mx-auto">{t('features.subheadline')}</p>
-          </Reveal>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {FEATURES.map((feat, i) => (
-              <Reveal key={feat.title} delay={i * 0.06} className={feat.wide ? 'md:col-span-2' : ''}>
-                <div className="bg-white rounded-[24px] shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-7 h-full text-left">
-                  <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center mb-4">
-                    <feat.icon className="w-5 h-5 text-[#3b82f6]" />
-                  </div>
-                  <h3 className="text-lg font-bold mb-2">{feat.title}</h3>
-                  <p className="text-[15px] text-[#555] leading-relaxed">{feat.desc}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════════════
-          SECTION 7: APP SHOWCASE GALLERY
+          SECTION 3: APP SHOWCASE GALLERY (moved up)
           ═══════════════════════════════════════════════════ */}
       <section id="showcase" className="py-20 sm:py-28 px-6">
         <div className="max-w-[1200px] mx-auto text-center">
@@ -514,14 +385,14 @@ export default function Landing() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {SHOWCASE_APPS.map((app, i) => (
               <Reveal key={app.name} delay={i * 0.06}>
-                <div className="bg-white rounded-[24px] shadow-[0_2px_20px_rgba(0,0,0,0.04)] overflow-hidden hover:shadow-[0_4px_30px_rgba(0,0,0,0.08)] transition-shadow">
-                  <div className={`h-40 bg-gradient-to-br ${app.gradient} flex items-center justify-center`}>
-                    <Smartphone className="w-12 h-12 text-white/40" />
+                <div className="bg-white rounded-[24px] shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.06)] overflow-hidden hover:shadow-[0_4px_30px_rgba(0,0,0,0.1)] transition-shadow">
+                  <div className={`h-48 bg-gradient-to-br ${app.gradient} flex items-center justify-center`}>
+                    <Smartphone className="w-14 h-14 text-white/40" />
                   </div>
                   <div className="p-5">
                     <div className="flex items-center justify-between mb-1">
                       <h3 className="font-bold">{app.name}</h3>
-                      <span className="text-xs text-[#999]">Built in {app.time}</span>
+                      <span className="text-xs text-gray-400">Built in {app.time}</span>
                     </div>
                     <span className="text-xs font-medium text-[#3b82f6] bg-blue-50 px-2.5 py-1 rounded-full">{app.category}</span>
                   </div>
@@ -533,7 +404,67 @@ export default function Landing() {
       </section>
 
       {/* ═══════════════════════════════════════════════════
-          SECTION 8: PRICING
+          SECTION 4: FEATURES BENTO GRID
+          ═══════════════════════════════════════════════════ */}
+      <section id="features" className="py-20 sm:py-28 px-6">
+        <div className="max-w-[1200px] mx-auto text-center">
+          <Reveal>
+            <SectionLabel>{t('features.label')}</SectionLabel>
+          </Reveal>
+          <Reveal delay={0.05}>
+            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-3">{t('features.headline')}</h2>
+          </Reveal>
+          <Reveal delay={0.08}>
+            <p className="text-gray-600 text-lg mb-12 max-w-xl mx-auto">{t('features.subheadline')}</p>
+          </Reveal>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {FEATURES.map((feat, i) => (
+              <Reveal key={feat.title} delay={i * 0.06} className={feat.wide ? 'md:col-span-2' : ''}>
+                <div className="bg-white rounded-[24px] shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.06)] p-7 h-full text-left">
+                  <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center mb-4">
+                    <feat.icon className="w-5 h-5 text-[#3b82f6]" />
+                  </div>
+                  <h3 className="text-lg font-bold mb-2">{feat.title}</h3>
+                  <p className="text-[15px] text-gray-600 leading-relaxed">{feat.desc}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════
+          SECTION 5: HOW IT WORKS
+          ═══════════════════════════════════════════════════ */}
+      <section id="how-it-works" className="py-20 sm:py-28 px-6">
+        <div className="max-w-[1000px] mx-auto text-center">
+          <Reveal>
+            <SectionLabel>{t('howItWorks.label')}</SectionLabel>
+          </Reveal>
+
+          <Reveal delay={0.1}>
+            <div className="bg-white rounded-[32px] shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.06)] p-8 sm:p-12">
+              <div className="flex flex-wrap justify-center gap-6 sm:gap-4">
+                {HOW_IT_WORKS_STEPS.map((step, i) => (
+                  <Reveal key={step.num} delay={i * 0.08}>
+                    <div className="flex flex-col items-center text-center w-[140px] sm:w-[160px]">
+                      <div className="w-12 h-12 rounded-full border-2 border-gray-200 flex items-center justify-center mb-4">
+                        <span className="text-sm font-bold text-gray-400">{step.num}</span>
+                      </div>
+                      <h3 className="text-xl font-bold mb-1">{step.word}</h3>
+                      <p className="text-[13px] text-gray-600 leading-relaxed">{step.desc}</p>
+                    </div>
+                  </Reveal>
+                ))}
+              </div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════
+          SECTION 6: PRICING
           ═══════════════════════════════════════════════════ */}
       <section id="pricing" className="py-20 sm:py-28 px-6">
         <div className="max-w-[1000px] mx-auto text-center">
@@ -544,14 +475,14 @@ export default function Landing() {
             <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-3">{t('pricing.title')}</h2>
           </Reveal>
           <Reveal delay={0.08}>
-            <p className="text-[#555] text-lg mb-12 max-w-xl mx-auto">{t('pricing.subtitle')}</p>
+            <p className="text-gray-600 text-lg mb-12 max-w-xl mx-auto">{t('pricing.subtitle')}</p>
           </Reveal>
 
           <div className="grid md:grid-cols-3 gap-5">
             {PLANS.map((plan, i) => (
               <Reveal key={plan.name} delay={i * 0.1}>
                 <div className={cn(
-                  'relative bg-white rounded-[24px] shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-7 flex flex-col h-full text-left',
+                  'relative bg-white rounded-[24px] shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.06)] p-7 flex flex-col h-full text-left',
                   plan.highlight && 'ring-2 ring-[#3b82f6]'
                 )}>
                   {plan.highlight && (
@@ -560,17 +491,17 @@ export default function Landing() {
                     </span>
                   )}
 
-                  <p className="text-sm font-medium text-[#999] mb-5">{plan.name}</p>
+                  <p className="text-sm font-medium text-gray-400 mb-5">{plan.name}</p>
 
                   <div className="flex items-baseline gap-1 mb-1">
-                    <span className="text-[42px] font-extrabold text-[#1a1615] leading-none">{plan.price}</span>
-                    {plan.period && <span className="text-sm text-[#999]">{plan.period}</span>}
+                    <span className="text-[42px] font-extrabold text-gray-900 leading-none">{plan.price}</span>
+                    {plan.period && <span className="text-sm text-gray-400">{plan.period}</span>}
                   </div>
-                  <p className="text-[12px] text-[#999] mb-8">{plan.credits}</p>
+                  <p className="text-[12px] text-gray-400 mb-8">{plan.credits}</p>
 
                   <ul className="space-y-3 flex-1 mb-8">
                     {plan.features.map((f) => (
-                      <li key={f} className="flex items-start gap-3 text-[13px] text-[#555]">
+                      <li key={f} className="flex items-start gap-3 text-[13px] text-gray-600">
                         <Check className="w-3.5 h-3.5 text-[#3b82f6] mt-0.5 flex-shrink-0" />
                         {f}
                       </li>
@@ -583,7 +514,7 @@ export default function Landing() {
                       'block text-center py-3 rounded-full text-[13px] font-semibold transition-colors',
                       plan.highlight
                         ? 'bg-[#3b82f6] text-white hover:bg-[#2563eb]'
-                        : 'bg-gray-100 text-[#1a1615] hover:bg-gray-200'
+                        : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
                     )}
                   >
                     {plan.cta}
@@ -594,11 +525,11 @@ export default function Landing() {
           </div>
 
           {/* ═══════════════════════════════════════════════
-              SECTION 9: COMPARISON TABLE
+              COMPARISON TABLE
               ═══════════════════════════════════════════════ */}
           <div className="mt-16">
             <Reveal>
-              <div className="bg-white rounded-[24px] shadow-[0_2px_20px_rgba(0,0,0,0.04)] overflow-hidden">
+              <div className="bg-white rounded-[24px] shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.06)] overflow-hidden">
                 <h3 className="text-2xl font-extrabold p-7 pb-0">{t('comparison.title')}</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm mt-4">
@@ -640,7 +571,7 @@ export default function Landing() {
       </section>
 
       {/* ═══════════════════════════════════════════════════
-          SECTION 10: FAQ
+          SECTION 7: FAQ
           ═══════════════════════════════════════════════════ */}
       <section className="py-20 sm:py-28 px-6">
         <div className="max-w-[800px] mx-auto">
@@ -657,7 +588,7 @@ export default function Landing() {
                 >
                   <span className="text-[15px] font-semibold pr-4">{item.q}</span>
                   <ChevronDown className={cn(
-                    'w-5 h-5 text-[#999] transition-transform flex-shrink-0',
+                    'w-5 h-5 text-gray-400 transition-transform flex-shrink-0',
                     openFaq === i && 'rotate-180'
                   )} />
                 </button>
@@ -670,7 +601,7 @@ export default function Landing() {
                       transition={{ duration: 0.3 }}
                       className="overflow-hidden"
                     >
-                      <p className="text-[15px] text-[#555] leading-relaxed pb-5">{item.a}</p>
+                      <p className="text-[15px] text-gray-600 leading-relaxed pb-5">{item.a}</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -681,12 +612,12 @@ export default function Landing() {
       </section>
 
       {/* ═══════════════════════════════════════════════════
-          SECTION 11: FINAL CTA
+          SECTION 8: FINAL CTA
           ═══════════════════════════════════════════════════ */}
       <section className="py-20 sm:py-28 px-6">
         <div className="max-w-[800px] mx-auto">
           <Reveal>
-            <div className="bg-[#1a1615] rounded-[32px] px-8 sm:px-16 py-16 text-center">
+            <div className="bg-gray-900 rounded-[32px] px-8 sm:px-16 py-16 text-center">
               <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-2 tracking-tight">
                 {t('cta.headline')}
               </h2>
@@ -694,7 +625,7 @@ export default function Landing() {
               <p className="text-white/40 mb-8 max-w-md mx-auto">{t('cta.desc')}</p>
               <Link
                 to={ctaPath}
-                className="bg-white text-[#1a1615] rounded-full px-8 py-4 font-semibold inline-flex items-center gap-2 hover:bg-white/90 transition-colors group"
+                className="bg-white text-gray-900 rounded-full px-8 py-4 font-semibold inline-flex items-center gap-2 hover:bg-white/90 transition-colors group"
               >
                 {t('cta.button')}
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
@@ -710,9 +641,9 @@ export default function Landing() {
       </section>
 
       {/* ═══════════════════════════════════════════════════
-          SECTION 12: FOOTER
+          SECTION 9: FOOTER
           ═══════════════════════════════════════════════════ */}
-      <footer className="bg-[#f0ece7] py-16 px-6">
+      <footer className="bg-gray-50 py-16 px-6">
         <div className="max-w-[1000px] mx-auto">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-10 mb-14">
             <div className="col-span-2 md:col-span-1">
@@ -720,9 +651,9 @@ export default function Landing() {
                 <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center p-1.5">
                   <img src="/logo.png" alt="AppX" className="w-full h-full" />
                 </div>
-                <span className="font-semibold text-sm text-[#1a1615]">AppX</span>
+                <span className="font-semibold text-sm text-gray-900">AppX</span>
               </Link>
-              <p className="text-sm text-[#999] leading-relaxed max-w-[180px]">
+              <p className="text-sm text-gray-400 leading-relaxed max-w-[180px]">
                 {t('footer.tagline')}
               </p>
             </div>
@@ -749,12 +680,12 @@ export default function Landing() {
           </div>
 
           <div className="pt-8 border-t border-black/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-[11px] text-[#999]">&copy; 2026 AppX Inc.</p>
-            <div className="flex items-center gap-4 text-[#999]">
-              <a href="https://github.com/appx" target="_blank" rel="noopener noreferrer" className="hover:text-[#1a1615] transition-colors">
+            <p className="text-[11px] text-gray-400">&copy; 2026 AppX Inc.</p>
+            <div className="flex items-center gap-4 text-gray-400">
+              <a href="https://github.com/appx" target="_blank" rel="noopener noreferrer" className="hover:text-gray-900 transition-colors">
                 <Github className="w-4 h-4" />
               </a>
-              <a href="https://twitter.com/appx" target="_blank" rel="noopener noreferrer" className="hover:text-[#1a1615] transition-colors">
+              <a href="https://twitter.com/appx" target="_blank" rel="noopener noreferrer" className="hover:text-gray-900 transition-colors">
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                 </svg>
