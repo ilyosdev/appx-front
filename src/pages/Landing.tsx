@@ -85,9 +85,9 @@ function Nav({ ctaPath, isAuthenticated }: { ctaPath: string; isAuthenticated: b
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center p-1.5">
-            <img src="/logo.png" alt="AppX" className="w-full h-full" />
+            <img src="/logo.png" alt="Zolt" className="w-full h-full" />
           </div>
-          <span className="font-semibold text-[15px] text-gray-900 tracking-tight">AppX</span>
+          <span className="font-semibold text-[15px] text-gray-900 tracking-tight">Zolt</span>
         </Link>
 
         {/* Center links */}
@@ -175,12 +175,12 @@ function Nav({ ctaPath, isAuthenticated }: { ctaPath: string; isAuthenticated: b
 
 // ─── SHOWCASE DATA ─────────────────────────────────────
 const SHOWCASE_APPS = [
-  { name: 'FitTrack Pro', category: 'Fitness', time: '12 min', gradient: 'from-emerald-500 to-teal-600' },
-  { name: 'FoodDash', category: 'Delivery', time: '18 min', gradient: 'from-orange-500 to-red-600' },
-  { name: 'MindfulMe', category: 'Wellness', time: '8 min', gradient: 'from-purple-500 to-indigo-600' },
-  { name: 'ShopLocal', category: 'E-commerce', time: '22 min', gradient: 'from-blue-500 to-cyan-600' },
-  { name: 'StudyBuddy', category: 'Education', time: '15 min', gradient: 'from-amber-500 to-yellow-600' },
-  { name: 'PetCare', category: 'Lifestyle', time: '10 min', gradient: 'from-pink-500 to-rose-600' },
+  { name: 'FitTrack', category: 'Fitness', time: '8 min', gradient: 'from-emerald-500 to-teal-600' },
+  { name: 'QuickBite', category: 'Delivery', time: '12 min', gradient: 'from-orange-500 to-red-600' },
+  { name: 'Zenflow', category: 'Wellness', time: '6 min', gradient: 'from-purple-500 to-indigo-600' },
+  { name: 'Bazaar', category: 'Marketplace', time: '15 min', gradient: 'from-blue-500 to-cyan-600' },
+  { name: 'Learnly', category: 'Education', time: '10 min', gradient: 'from-amber-500 to-yellow-600' },
+  { name: 'Pawpal', category: 'Lifestyle', time: '7 min', gradient: 'from-pink-500 to-rose-600' },
 ];
 
 // ─── FAQ DATA ──────────────────────────────────────────
@@ -189,19 +189,19 @@ const FAQ_ITEMS = [
   { q: 'Is it really production-quality code?', a: 'Yes. Expo + React Native \u2014 the same stack used by companies like Shopify, Discord, and thousands of startups. StyleSheet.create, proper navigation, real state management.' },
   { q: 'Can I edit the code myself?', a: 'Absolutely. Export to GitHub, open in VS Code or any IDE. It\'s your code \u2014 no lock-in, no proprietary format.' },
   { q: 'What if the AI gets it wrong?', a: 'Just tell it. Every change is conversational. Say "make the button bigger" or "add a settings screen" and it updates instantly. You can also edit the code directly.' },
-  { q: 'How does App Store publishing work?', a: 'AppX uses EAS Build from Expo. Connect your Apple Developer account, and we handle the build, signing, and submission process.' },
+  { q: 'How does App Store submission work?', a: 'When your app is ready, request a submission through Zolt. Our team reviews your app, handles the build, signing, screenshots, and submission to Apple and Google — for a one-time fee based on your app\'s complexity.' },
   { q: 'Will my app work on Android too?', a: 'Yes. React Native runs on both iOS and Android from the same codebase. Build once, ship everywhere.' },
-  { q: 'What can I build with this?', a: 'Anything from a simple habit tracker to a multi-screen marketplace with user auth, data storage, and real-time features. If React Native can do it, AppX can build it.' },
+  { q: 'What can I build with this?', a: 'Anything from a simple habit tracker to a multi-screen marketplace with user auth, data storage, and real-time features. If React Native can do it, Zolt can prototype it.' },
 ];
 
 // ─── COMPARISON DATA ───────────────────────────────────
-const COMPARISON_HEADERS = ['', 'AppX Pro', 'Freelance Dev', 'No-Code Tool'];
+const COMPARISON_HEADERS = ['', 'Zolt Pro', 'Freelance Dev', 'No-Code Tool'];
 const COMPARISON_ROWS = [
-  ['Cost', '$20/mo', '$5,000\u2013$50,000', '$30\u2013$300/mo'],
-  ['Time to App Store', 'Hours', 'Months', 'Never (web only)'],
+  ['Cost', '$20/mo + submission fee', '$5,000\u2013$50,000', '$30\u2013$300/mo'],
+  ['Time to App Store', 'Days (with our help)', 'Months', 'Never (web only)'],
   ['Real native code', '\u2713', '\u2713', '\u2717'],
   ['You own the code', '\u2713', '\u2713', '\u2717'],
-  ['App Store publishing', '\u2713', '\u2713', '\u2717'],
+  ['App Store publishing', 'Done for you', '\u2713', '\u2717'],
 ];
 
 // ─── SOCIAL PROOF BRANDS ───────────────────────────────
@@ -281,6 +281,8 @@ export default function Landing() {
         .font-sans { font-family: 'Inter', system-ui, sans-serif; }
         body { font-family: 'Inter', system-ui, sans-serif; }
         @keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        @keyframes aurora { 0%, 100% { opacity: 0.4; transform: scale(1) rotate(0deg); } 50% { opacity: 0.6; transform: scale(1.1) rotate(3deg); } }
+        .aurora-blob { position: absolute; border-radius: 50%; filter: blur(80px); animation: aurora 8s ease-in-out infinite; pointer-events: none; }
       `}</style>
 
       <Nav ctaPath={ctaPath} isAuthenticated={isAuthenticated} />
@@ -288,13 +290,18 @@ export default function Landing() {
       {/* ═══════════════════════════════════════════════════
           SECTION 1: HERO — Input is the star
           ═══════════════════════════════════════════════════ */}
-      <section className="relative pt-32 sm:pt-40 pb-20 sm:pb-28 px-6 bg-gradient-to-b from-[#f0f5ff] via-white to-white">
-        <div className="max-w-4xl mx-auto text-center">
+      <section className="relative pt-32 sm:pt-40 pb-20 sm:pb-28 px-6 bg-gradient-to-b from-[#0a0a1a] via-[#0d1117] to-white overflow-hidden">
+          {/* Aurora blobs */}
+          <div className="aurora-blob w-[600px] h-[600px] bg-[#7c3aed]/30 top-[-100px] left-[-200px]" />
+          <div className="aurora-blob w-[500px] h-[500px] bg-[#3b82f6]/25 top-[-50px] right-[-150px]" style={{ animationDelay: '2s' }} />
+          <div className="aurora-blob w-[400px] h-[400px] bg-[#06b6d4]/20 top-[200px] left-[30%]" style={{ animationDelay: '4s' }} />
+          <div className="aurora-blob w-[350px] h-[350px] bg-[#10b981]/15 top-[100px] right-[20%]" style={{ animationDelay: '6s' }} />
+        <div className="relative z-10 max-w-4xl mx-auto text-center">
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-xs font-semibold uppercase tracking-[0.25em] text-[#3b82f6] mb-6"
+            className="text-xs font-semibold uppercase tracking-[0.25em] text-[#7c3aed] mb-6"
           >
             {t('hero.superTagline')}
           </motion.p>
@@ -305,16 +312,16 @@ export default function Landing() {
             transition={{ duration: 0.9, delay: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
             className="text-[clamp(2.5rem,7vw,5.5rem)] font-extrabold tracking-tight leading-[1.05]"
           >
-            <span className="text-gray-900">{t('hero.headline1')}</span>
+            <span className="text-white">{t('hero.headline1')}</span>
             <br />
-            <span className="text-gray-400">{t('hero.headline2')}</span>
+            <span className="bg-gradient-to-r from-[#7c3aed] via-[#3b82f6] to-[#06b6d4] bg-clip-text text-transparent">{t('hero.headline2')}</span>
           </motion.h1>
 
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.7 }}
-            className="text-lg sm:text-xl text-gray-600 mt-6 mb-10 max-w-2xl mx-auto leading-relaxed"
+            className="text-lg sm:text-xl text-gray-400 mt-6 mb-10 max-w-2xl mx-auto leading-relaxed"
           >
             {t('hero.subheadline')}
           </motion.p>
@@ -325,7 +332,7 @@ export default function Landing() {
             transition={{ duration: 0.8, delay: 1.0 }}
             className="max-w-3xl mx-auto"
           >
-            <AppComposer variant="light" />
+            <AppComposer variant="dark" />
           </motion.div>
 
           {/* Trust strip — replaces "What You Get" section */}
@@ -525,6 +532,23 @@ export default function Landing() {
           </div>
 
           {/* ═══════════════════════════════════════════════
+              SUBMISSION SERVICE CALLOUT
+              ═══════════════════════════════════════════════ */}
+          <Reveal delay={0.15}>
+            <div className="mt-10 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-[24px] p-8 sm:p-10 text-center">
+              <div className="flex items-center justify-center gap-2 mb-3">
+                <Rocket className="w-5 h-5 text-[#3b82f6]" />
+                <span className="text-sm font-semibold text-[#3b82f6] uppercase tracking-wide">App Store Submission Service</span>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">Ready to ship? We'll handle it.</h3>
+              <p className="text-gray-600 max-w-lg mx-auto mb-6">When your prototype is ready for the real world, our team handles the entire App Store and Google Play submission — builds, signing, screenshots, review process. One-time fee based on your app's complexity.</p>
+              <Link to={ctaPath} className="inline-flex items-center gap-2 bg-gray-900 text-white rounded-full px-6 py-3 text-sm font-semibold hover:bg-gray-800 transition-colors">
+                Get a Quote <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </Reveal>
+
+          {/* ═══════════════════════════════════════════════
               COMPARISON TABLE
               ═══════════════════════════════════════════════ */}
           <div className="mt-16">
@@ -649,9 +673,9 @@ export default function Landing() {
             <div className="col-span-2 md:col-span-1">
               <Link to="/" className="flex items-center gap-2 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center p-1.5">
-                  <img src="/logo.png" alt="AppX" className="w-full h-full" />
+                  <img src="/logo.png" alt="Zolt" className="w-full h-full" />
                 </div>
-                <span className="font-semibold text-sm text-gray-900">AppX</span>
+                <span className="font-semibold text-sm text-gray-900">Zolt</span>
               </Link>
               <p className="text-sm text-gray-400 leading-relaxed max-w-[180px]">
                 {t('footer.tagline')}
@@ -680,7 +704,7 @@ export default function Landing() {
           </div>
 
           <div className="pt-8 border-t border-black/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-[11px] text-gray-400">&copy; 2026 AppX Inc.</p>
+            <p className="text-[11px] text-gray-400">&copy; 2026 Zolt Inc.</p>
             <div className="flex items-center gap-4 text-gray-400">
               <a href="https://github.com/appx" target="_blank" rel="noopener noreferrer" className="hover:text-gray-900 transition-colors">
                 <Github className="w-4 h-4" />

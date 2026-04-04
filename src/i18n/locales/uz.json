@@ -9,22 +9,22 @@
     "dashboard": "Boshqaruv"
   },
   "hero": {
-    "superTagline": "The only AI that ships to the App Store",
-    "headline1": "Your app idea.",
-    "headline2": "In the App Store by tomorrow.",
-    "subheadline": "Describe what you want in plain English. AppX writes production React Native code, lets you test on your real phone in seconds, and publishes to App Store & Google Play — no engineers needed.",
-    "trustLine": "Free to start · No credit card required",
-    "inputPlaceholder": "Yaratmoqchi bo'lgan mobil ilovangizni tasvirlab bering..."
+    "superTagline": "From idea to working prototype in minutes",
+    "headline1": "Describe your app.",
+    "headline2": "Watch it come alive.",
+    "subheadline": "Zolt turns plain English into real React Native apps you can test on your phone instantly. When you're ready to ship, we handle the App Store submission for you.",
+    "trustLine": "600+ builders on the waitlist \u00b7 Free to start",
+    "inputPlaceholder": "Yaratmoqchi bo\u2018lgan mobil ilovangizni tasvirlab bering..."
   },
   "socialProof": {
-    "title": "Trusted by startups, founders and indie hackers"
+    "title": "Join 600+ founders and builders already on the waitlist"
   },
   "whatYouGet": {
     "label": "What you get",
     "headline": "Not a mockup. A real app.",
     "realCode": {
       "title": "Real React Native Code",
-      "desc": "Not drag-and-drop output. Every app is a real Expo project — inspect it, edit it, hand it to a developer, own it forever."
+      "desc": "Not drag-and-drop output. Every app is a real Expo project \u2014 inspect it, edit it, hand it to a developer, own it forever."
     },
     "phoneTest": {
       "title": "Test on Your Actual Phone",
@@ -32,17 +32,17 @@
     },
     "appStore": {
       "title": "Publish to App Store & Google Play",
-      "desc": "Hit one button. AppX handles the build, signing, and submission through EAS. Your app goes live — without Xcode or Android Studio."
+      "desc": "Hit one button. AppX handles the build, signing, and submission through EAS. Your app goes live \u2014 without Xcode or Android Studio."
     }
   },
   "features": {
     "label": "Features",
-    "headline": "Built for builders, powered by AI",
-    "subheadline": "Everything you need to go from idea to App Store",
+    "headline": "Everything you need to prototype and ship",
+    "subheadline": "From first idea to App Store \u2014 we've got you covered",
     "items": {
       "multiScreen": {
         "title": "Multi-Screen Generation",
-        "desc": "Describe an entire app. Get a complete project with navigation, state management, and data flow — not just a single screen."
+        "desc": "Describe an entire app. Get a complete project with navigation, state management, and data flow \u2014 not just a single screen."
       },
       "livePreview": {
         "title": "Live Device Preview",
@@ -50,11 +50,11 @@
       },
       "chatDriven": {
         "title": "Chat-Driven Iteration",
-        "desc": "Refine any screen conversationally. Change layouts, colors, logic — like pair-programming with a senior engineer."
+        "desc": "Refine any screen conversationally. Change layouts, colors, logic \u2014 like pair-programming with a senior engineer."
       },
       "publish": {
-        "title": "One-Click Publish",
-        "desc": "Deploy to the web instantly. Export to GitHub. Build with EAS. Ship to App Store and Google Play."
+        "title": "App Store Submission",
+        "desc": "When your app is ready, our team handles the entire App Store and Google Play submission process for you. One-time fee, zero hassle."
       },
       "realCode": {
         "title": "Real Code You Own",
@@ -62,7 +62,7 @@
       },
       "gemini": {
         "title": "Powered by Gemini 2.5 Pro",
-        "desc": "AppX uses Google's most capable coding model to plan, write, and validate your app's code — so what you get actually works."
+        "desc": "Zolt uses Google's most capable coding model to plan, write, and validate your app's code \u2014 so what you get actually works."
       }
     }
   },
@@ -74,7 +74,7 @@
     },
     "generate": {
       "word": "Generate",
-      "desc": "AI plans your screens, writes navigation logic, and generates real React Native code — live."
+      "desc": "AI plans your screens, writes navigation logic, and generates real React Native code \u2014 live."
     },
     "preview": {
       "word": "Preview",
@@ -115,19 +115,43 @@
   },
   "showcase": {
     "label": "Showcase",
-    "headline": "See what people are building",
+    "headline": "Built with Zolt",
     "apps": [
-      { "name": "FitTrack Pro", "category": "Fitness", "time": "12 min" },
-      { "name": "FoodDash", "category": "Delivery", "time": "18 min" },
-      { "name": "MindfulMe", "category": "Wellness", "time": "8 min" },
-      { "name": "ShopLocal", "category": "E-commerce", "time": "22 min" },
-      { "name": "StudyBuddy", "category": "Education", "time": "15 min" },
-      { "name": "PetCare", "category": "Lifestyle", "time": "10 min" }
+      {
+        "name": "FitTrack Pro",
+        "category": "Fitness",
+        "time": "12 min"
+      },
+      {
+        "name": "FoodDash",
+        "category": "Delivery",
+        "time": "18 min"
+      },
+      {
+        "name": "MindfulMe",
+        "category": "Wellness",
+        "time": "8 min"
+      },
+      {
+        "name": "ShopLocal",
+        "category": "E-commerce",
+        "time": "22 min"
+      },
+      {
+        "name": "StudyBuddy",
+        "category": "Education",
+        "time": "15 min"
+      },
+      {
+        "name": "PetCare",
+        "category": "Lifestyle",
+        "time": "10 min"
+      }
     ]
   },
   "pricing": {
-    "title": "Simple plans for serious work",
-    "subtitle": "Start free. Build your first app today. Upgrade when you're ready to ship.",
+    "title": "Start free, scale when ready",
+    "subtitle": "Build your prototype for free. Pay only when you need more power or want to ship to the App Store.",
     "mostPopular": "Mashhur",
     "creditsPerMonth": "kredit / oy",
     "free": {
@@ -160,37 +184,88 @@
     }
   },
   "comparison": {
-    "title": "Why AppX?",
-    "headers": ["", "AppX Pro", "Freelance Dev", "No-Code Tool"],
+    "title": "Why Zolt?",
+    "headers": [
+      "",
+      "Zolt Pro",
+      "Freelance Dev",
+      "No-Code Tool"
+    ],
     "rows": {
-      "cost": ["Cost", "$20/mo", "$5,000–$50,000", "$30–$300/mo"],
-      "time": ["Time to App Store", "Hours", "Months", "Never (web only)"],
-      "native": ["Real native code", "✓", "✓", "✗"],
-      "ownCode": ["You own the code", "✓", "✓", "✗"],
-      "appStore": ["App Store publishing", "✓", "✓", "✗"]
+      "cost": [
+        "Cost",
+        "$20/mo + submission fee",
+        "$5,000\u2013$50,000",
+        "$30\u2013$300/mo"
+      ],
+      "time": [
+        "Time to App Store",
+        "Days (with our help)",
+        "Months",
+        "Never (web only)"
+      ],
+      "native": [
+        "Real native code",
+        "\u2713",
+        "\u2713",
+        "\u2717"
+      ],
+      "ownCode": [
+        "You own the code",
+        "\u2713",
+        "\u2713",
+        "\u2717"
+      ],
+      "appStore": [
+        "App Store submission",
+        "Done for you",
+        "\u2713",
+        "\u2717"
+      ]
     }
   },
   "faq": {
     "headline": "Frequently asked questions",
     "items": [
-      { "q": "Do I need coding experience?", "a": "No. But if you can code, you'll love the real code output. Every project is a standard Expo/React Native codebase you can open in any IDE." },
-      { "q": "Is it really production-quality code?", "a": "Yes. Expo + React Native — the same stack used by companies like Shopify, Discord, and thousands of startups. StyleSheet.create, proper navigation, real state management." },
-      { "q": "Can I edit the code myself?", "a": "Absolutely. Export to GitHub, open in VS Code or any IDE. It's your code — no lock-in, no proprietary format." },
-      { "q": "What if the AI gets it wrong?", "a": "Just tell it. Every change is conversational. Say \"make the button bigger\" or \"add a settings screen\" and it updates instantly. You can also edit the code directly." },
-      { "q": "How does App Store publishing work?", "a": "AppX uses EAS Build from Expo. Connect your Apple Developer account, and we handle the build, signing, and submission process." },
-      { "q": "Will my app work on Android too?", "a": "Yes. React Native runs on both iOS and Android from the same codebase. Build once, ship everywhere." },
-      { "q": "What can I build with this?", "a": "Anything from a simple habit tracker to a multi-screen marketplace with user auth, data storage, and real-time features. If React Native can do it, AppX can build it." }
+      {
+        "q": "Do I need coding experience?",
+        "a": "No. But if you can code, you'll love the real code output. Every project is a standard Expo/React Native codebase you can open in any IDE."
+      },
+      {
+        "q": "Is it really production-quality code?",
+        "a": "Yes. Expo + React Native \u2014 the same stack used by companies like Shopify, Discord, and thousands of startups. StyleSheet.create, proper navigation, real state management."
+      },
+      {
+        "q": "Can I edit the code myself?",
+        "a": "Absolutely. Export to GitHub, open in VS Code or any IDE. It's your code \u2014 no lock-in, no proprietary format."
+      },
+      {
+        "q": "What if the AI gets it wrong?",
+        "a": "Just tell it. Every change is conversational. Say \"make the button bigger\" or \"add a settings screen\" and it updates instantly. You can also edit the code directly."
+      },
+      {
+        "q": "How does App Store submission work?",
+        "a": "When your app is ready, request a submission through Zolt. Our team reviews your app, handles the build, signing, screenshots, and submission to Apple and Google \u2014 for a one-time fee based on your app's complexity."
+      },
+      {
+        "q": "Will my app work on Android too?",
+        "a": "Yes. React Native runs on both iOS and Android from the same codebase. Build once, ship everywhere."
+      },
+      {
+        "q": "What can I build with this?",
+        "a": "Anything from a simple habit tracker to a multi-screen marketplace with user auth, data storage, and real-time features. If React Native can do it, Zolt can prototype it."
+      }
     ]
   },
   "cta": {
-    "headline": "Your idea deserves to be in the App Store.",
-    "sub": "Not stuck in a doc somewhere.",
-    "desc": "Join thousands of founders, designers, and builders who shipped their apps with AppX. Start free — no credit card, no code, no waiting.",
-    "button": "Bepul boshlash",
+    "headline": "Your app idea deserves to exist.",
+    "sub": "Stop planning. Start building.",
+    "desc": "Join 600+ builders who are turning ideas into real, working mobile apps with Zolt. Free to start \u2014 no credit card, no code, no waiting.",
+    "button": "Start Building Free",
     "secondary": "See what people are building"
   },
   "footer": {
-    "tagline": "Mobil ilovalar yaratish uchun AI platforma.",
+    "tagline": "From idea to App Store. We handle everything in between.",
     "product": "Mahsulot",
     "developers": "Dasturchilar",
     "company": "Kompaniya",
@@ -300,7 +375,7 @@
   },
   "language": {
     "en": "English",
-    "ru": "Русский",
+    "ru": "\u0420\u0443\u0441\u0441\u043a\u0438\u0439",
     "uz": "O'zbek"
   }
 }
